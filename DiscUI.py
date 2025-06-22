@@ -13,19 +13,20 @@ class DiscGame:
         self.disc=Disc(self.event_bus)
 
         #创建游戏所需实体
-
+        # print(1)
         self.subscribe_main_event()
-
+        # self.start_game()
 
     def subscribe_main_event(self):
         pass
 
     def start_game(self):
+        print("game_start")
         self.event_bus.publish(GameStartEvent(
             self,None,
             {self.team1.team_id:self.player_num,self.team2.team_id:self.player_num},
             {self.team1.team_id:(0,0,60,1280),self.team2.team_id:(1860,0,60,1280)}))
-        print("game_start")
+
     def mainloop(self):
 
 
@@ -58,7 +59,7 @@ class EventBus:
 
     def publish(self, event):
         """发布事件：将事件分发给所有订阅者"""
-        event_type = event
+        event_type = type(event)
         if event_type in self.subscribers:
             for callback in self.subscribers[event_type]:
                 callback(event)
@@ -187,7 +188,7 @@ class UI:
         self.clock.tick(60)
 
 '''接口'''
-def game(player_num,team_agent_list=None,player_agent_list=None,*args,**kwargs):
+def game(player_num,team_agent_list=None,player_agent_list=None):
     pygame.init()
     screen = pygame.display.set_mode((1920, 1280))
     clock = pygame.time.Clock()
