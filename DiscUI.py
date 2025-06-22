@@ -177,10 +177,10 @@ class UI:
         for eve in pygame.event.get():
             if eve.type == pygame.QUIT:
                 pygame.quit()
-        self.screen.fill((255,255,random.randint(1,255)))
+        self.screen.fill('green')
         pygame.draw.rect(self.screen,(104,202,255),self.score_loc[0])
         pygame.draw.rect(self.screen,(255,86,86),self.score_loc[1])
-        pygame.draw.rect(self.screen,"white",(0,1920/2-5,10,1280))
+        pygame.draw.rect(self.screen, "white", (955, 0, 10, 1280))
         pygame.display.flip()
         self.clock.tick(60)
 
