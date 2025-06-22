@@ -1,3 +1,4 @@
+
 class DiscGame:
     def __init__(self,screen,clock,player_num,team_agent_list=None,player_agent_list=None):
         self.screen=screen
@@ -11,14 +12,22 @@ class DiscGame:
         self.team1=Team(1,self.event_bus)
         self.team2=Team(2,self.event_bus)
         self.disc=Disc(self.event_bus)
-
         #创建游戏所需实体
+
+        self.game_state=GameState(self.team1,self.team2,self.disc,self.screen)
         # print(1)
         self.subscribe_main_event()
         # self.start_game()
 
+    def change_disc_state(self,event):
+        pass
+    def change_team_state(self,event):
+        pass
+    def change_score(self,event):
+        pass
     def subscribe_main_event(self):
         pass
+
 
     def start_game(self):
         print("game_start")
@@ -28,11 +37,8 @@ class DiscGame:
             {self.team1.team_id:(0,0,60,1280),self.team2.team_id:(1860,0,60,1280)}))
 
     def mainloop(self):
-
-
-
-        self.event_bus.publish(GameState)
-        pass
+        self.event_bus.publish(self.game_state)
+        self.DiscUI.draw_new_state()
 
 
 class Event:
@@ -74,6 +80,9 @@ class DiscCaughtEvent(Event):
 class DiscMovedEvent(Event):
     pass
 
+class DiscStateEvent(Event):
+    pass
+
 
 class PlayerMovedEvent(Event):
     pass
@@ -81,6 +90,9 @@ class PlayerMovedEvent(Event):
 class PlayerActionEvent(Event):
     pass
 
+
+class TeamStateEvent(Event):
+    pass
 
 class ScoreEvent(Event):
     pass
@@ -155,9 +167,8 @@ class Disc(Entity):
         pass
 
 
-class GameState(Event):
-    def __init__(self,sender,event_bus,team1:Team,team2:Team,disc:Disc,screen):
-        super().__init__(sender,event_bus)
+class GameState:
+    def __init__(self,team1:Team,team2:Team,disc:Disc,screen):
         self.team1=team1
         self.team2=team2
         self.disc=disc
@@ -169,28 +180,27 @@ class UI:
         self.event_bus=event_bus
         self.screen=screen
         self.clock=clock
-        self.event_bus.subscribe(GameState,self.draw_new_state)
+        # self.event_bus.subscribe(GameState,self.draw_new_state)
         self.event_bus.subscribe(GameStartEvent,self.set_rule)
 
     def set_rule(self,event):
         self.score_loc=list(event.score_loc.values())
         print("ui")
-    def draw_new_state(self,event):
+    def draw_new_state(self):
         for eve in pygame.event.get():
             if eve.type == pygame.QUIT:
                 pygame.quit()
-        self.screen.fill("green")
+        self.screen.fill('green')
         pygame.draw.rect(self.screen,(104,202,255),self.score_loc[0])
         pygame.draw.rect(self.screen,(255,86,86),self.score_loc[1])
-
-
+        pygame.draw.rect(self.screen, "white", (955, 0, 10, 1280))
         pygame.display.flip()
         self.clock.tick(60)
 
 '''接口'''
 def game(player_num,team_agent_list=None,player_agent_list=None):
     pygame.init()
-    screen = pygame.display.set_mode((1920, 1280))
+    screen = pygame.display.set_mode((1920,1280))
     clock = pygame.time.Clock()
     Game=DiscGame(screen,clock,player_num,team_agent_list,player_agent_list)
     Game.start_game()
