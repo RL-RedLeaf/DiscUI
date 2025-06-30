@@ -14,6 +14,7 @@ class DiscGame:
         self.disc=Disc(self.event_bus)
         #创建游戏所需实体
 
+
         self.game_state=GameState({1:self.team1,2:self.team2},self.disc,self.screen)
 
         self.subscribe_main_event() #订阅所需事件
@@ -31,6 +32,7 @@ class DiscGame:
         self.event_bus.subscribe(TeamStateEvent,self.change_team_state)
 
 
+
     def start_game(self):                   #发布开始游戏事件，包含游戏得分区等信息，应被所有实体订阅
         print("game_start")
         self.event_bus.publish(GameStartEvent(
@@ -39,10 +41,12 @@ class DiscGame:
             {self.team1.team_id:(0,0,60,1280),self.team2.team_id:(1860,0,60,1280)},
             {self.team1.team_id:[(1920//2-180,1280//(self.player_num+1)*(i+1)) for i in range(self.player_num+1)],self.team2.team_id:[(1920//2+180,1280//(self.player_num+1)*(j+1)) for j in range(self.player_num+1)]}))
 
+
     def mainloop(self):                     #主循环
         self.event_bus.publish(self.game_state) #发布当前游戏状态
 
         self.DiscUI.draw_new_state(self.game_state)            #绘制界面
+
 
 
 class Event:
@@ -96,9 +100,11 @@ class PlayerActionEvent(Event):
 
 
 class TeamStateEvent(Event):
+
     def __init__(self,team,sender,target=None):
         super().__init__(sender,target)
         self.team=team
+
 
 class ScoreEvent(Event):
     pass
@@ -170,9 +176,11 @@ class Disc(Entity):                      #飞盘类，与游戏主线程和队�
     def state_change(self):              #与队员交互，处理状态改编事件
         pass
 
+
 class GameState:                         #游戏主状态，用于传达所有游戏状态，应被所有实体订阅
     def __init__(self,teams,disc:Disc,screen):
         self.teams=teams
+
         self.disc=disc
         self.screen=screen
 
@@ -191,11 +199,16 @@ class UI:                                       #可视化类
     def set_rule(self,event):                   #初始化设置绘制规则
         self.score_loc=list(event.score_loc.values())
         print("ui")
+
     def draw_new_state(self,event):             #游戏主线程中负责可视化
+
+
         for eve in pygame.event.get():
             if eve.type == pygame.QUIT:
                 pygame.quit()
         self.screen.fill('green')
+        
+
         pygame.draw.rect(self.screen,(104,202,255),self.score_loc[0])  #得分区1
         pygame.draw.rect(self.screen,(255,86,86),self.score_loc[1])    #得分区2
         pygame.draw.rect(self.screen, "white", (955, 0, 10, 1280))#中线
@@ -205,12 +218,15 @@ class UI:                                       #可视化类
                 # print(player)
                 pygame.draw.circle(self.screen,"blue" if player.team_id==1 else "red",player.pos,10)
 
+
         pygame.display.flip()
         # self.clock.tick(60)
 
 '''主程序接口'''
 def game(player_num,team_agent_list=None,player_agent_list=None):
+
     pygame.init()                                   #初始化pygame
+
     screen = pygame.display.set_mode((1920,1280))
     clock = pygame.time.Clock()
     Game=DiscGame(                                  #创建游戏
