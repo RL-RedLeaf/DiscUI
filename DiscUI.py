@@ -1,3 +1,5 @@
+import time
+
 
 class DiscGame:
     def __init__(self,screen,clock,player_num,team_agent_list=None,player_agent_list=None):
@@ -6,7 +8,7 @@ class DiscGame:
         self.player_num=player_num
         self.team_agent_list=team_agent_list      #前半部分为1队，后半部分为2队
         self.player_agent_list=player_agent_list  #前半部分为1队，后半部分为2队
-
+        self.running =True
         self.event_bus=EventBus()                 #事件总线，通过DiscGame类将事件总线分发给各类
         self.DiscUI=UI(self.event_bus,self.screen,self.clock)
         self.team1=Team(1,self.event_bus)
@@ -39,11 +41,16 @@ class DiscGame:
             self,None,
             {self.team1.team_id:self.player_num,self.team2.team_id:self.player_num},
             {self.team1.team_id:(0,0,60,1280),self.team2.team_id:(1860,0,60,1280)},
-            {self.team1.team_id:[(1920//2-180,1280//(self.player_num+1)*(i+1)) for i in range(self.player_num+1)],self.team2.team_id:[(1920//2+180,1280//(self.player_num+1)*(j+1)) for j in range(self.player_num+1)]}))
-
+            {self.team1.team_id:[[1920//2-180,1280//(self.player_num+1)*(i+1)] for i in range(self.player_num+1)],self.team2.team_id:[[1920//2+180,1280//(self.player_num+1)*(j+1)] for j in range(self.player_num+1)]}))
+        self.event_bus.publish(self.game_state)
+        while self.running:
+            self.clock.tick(60)
+            self.mainloop()
+            time.sleep(0.01)
     def mainloop(self):                     #主循环
-        self.event_bus.publish(self.game_state) #发布当前游戏状态
+        # 发布当前游戏状态
 
+        self.event_bus.publish(self.game_state)
         self.DiscUI.draw_new_state(self.game_state)            #绘制界面
 
 
@@ -130,7 +137,8 @@ class Team:                             #队伍类，与队员和游戏主进程
         self.team_id=team_id
         self.event_bus=event_bus
         self.event_bus.subscribe(GameStartEvent,self.create_players)
-
+        self.event_bus.subscribe(GameState,self.mainloop)
+        self.running=True
     def team_agent(self):               #进行队伍决策
         pass
 
@@ -140,11 +148,9 @@ class Team:                             #队伍类，与队员和游戏主进程
         for i in range(num):
             self.player_list.append(Player(i,self.team_id,pos_list[i],self.event_bus,self))
         self.event_bus.publish(TeamStateEvent(self,self))
-        pass
 
-    def mainloop(self):                 #团队主进程，包括更新队伍状态，进行计算/决策等
+    def mainloop(self,event):                 #团队主进程，包括更新队伍状态，进行计算/决策等
         pass
-
 
 class Player(Entity):                   #队员类，不与游戏主进程进行直接交互，将信息传达至自己的team类
     def __init__(self,id,team_id,pos,event_bus,team): #id为队员编号，team_id为队伍编号
@@ -165,13 +171,16 @@ class Disc(Entity):                      #飞盘类，与游戏主线程和队�
         self.pos=[1920//2,1280//2]
         self.state=None
         self.event_bus.subscribe(GameStartEvent,self.create_disc)
+        self.event_bus.subscribe(GameState, self.mainloop)
+        self.running=True
     def create_disc(self,event):
         self.event_bus.publish(DiscStateEvent(self,self))
+
 
     def state_update(self):              #与主线程进行交互，发布state事件
         pass
 
-    def mainloop(self):                  #处理移动等信息
+    def mainloop(self,event):                  #处理移动等信息
         pass
 
     def state_change(self):              #与队员交互，处理状态改编事件
@@ -226,8 +235,5 @@ def game(player_num,team_agent_list=None,player_agent_list=None):
         player_num,
         team_agent_list,player_agent_list)
     Game.start_game()                               #开始游戏
-    while True:
-        clock.tick(60)
-        Game.mainloop()                             #主线程
 
 
