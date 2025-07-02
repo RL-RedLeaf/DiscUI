@@ -235,5 +235,5 @@ def game(player_num,team_agent_list=None,player_agent_list=None):
         player_num,
         team_agent_list,player_agent_list)
     Game.start_game()                               #开始游戏
-
-
+'''导入时自动输出注意事项'''
+print('注意事项:\n1,使用game()函数开始一局游戏\n2,game(player_num,team_agent_dict=None,player_agent_dict=None\n3,team_agent_dict={team_id=1:team_agent,team_id=2:team_agent}\n4,player_agent_disc={team_id:[player_agent1,player_agent2,...,player_agent(player_num)]})')
