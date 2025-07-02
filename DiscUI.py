@@ -20,7 +20,8 @@ class DiscGame:
 
     '''change系列函数会订阅对应的事件，接收游戏内实体的状态，以便汇总传入GameState'''
     def change_disc_state(self,event):
-        pass
+        print("disc update")
+        self.game_state.disc= event.disc
     def change_team_state(self,event):
         print("team update")
         self.game_state.teams[event.team.team_id]=event.team
@@ -29,6 +30,7 @@ class DiscGame:
 
     def subscribe_main_event(self):
         self.event_bus.subscribe(TeamStateEvent,self.change_team_state)
+        self.event_bus.subscribe(DiscStateEvent,self.change_disc_state)
 
 
     def start_game(self):                   #发布开始游戏事件，包含游戏得分区等信息，应被所有实体订阅
@@ -85,8 +87,9 @@ class DiscMovedEvent(Event):
     pass
 
 class DiscStateEvent(Event):
-    pass
-
+    def __init__(self, disc, sender, target=None):
+        super().__init__(sender, target)
+        self.disc = disc
 
 class PlayerMovedEvent(Event):
     pass
@@ -159,7 +162,11 @@ class Player(Entity):                   #队员类，不与游戏主进程进行
 class Disc(Entity):                      #飞盘类，与游戏主线程和队员进行交互
     def __init__(self,event_bus):
         super().__init__(event_bus)
-        pass
+        self.pos=[1920//2,1280//2]
+        self.state=None
+        self.event_bus.subscribe(GameStartEvent,self.create_disc)
+    def create_disc(self,event):
+        self.event_bus.publish(DiscStateEvent(self,self))
 
     def state_update(self):              #与主线程进行交互，发布state事件
         pass
@@ -198,15 +205,16 @@ class UI:                                       #可视化类
         self.screen.fill('green')
         pygame.draw.rect(self.screen,(104,202,255),self.score_loc[0])  #得分区1
         pygame.draw.rect(self.screen,(255,86,86),self.score_loc[1])    #得分区2
-        pygame.draw.rect(self.screen, "white", (955, 0, 10, 1280))#中线
+        pygame.draw.rect(self.screen, "white", (958, 0, 4, 1280))#中线
+        #队员
         for team in list(event.teams.values()):
-            # print(team)
             for player in team.player_list:
-                # print(player)
-                pygame.draw.circle(self.screen,"blue" if player.team_id==1 else "red",player.pos,10)
-
+                pygame.draw.circle(self.screen,"blue" if player.team_id==1 else "red",player.pos,20)
+        #飞碟
+        pygame.draw.circle(self.screen,'yellow',event.disc.pos,10)
+        pygame.draw.circle(self.screen, 'black', event.disc.pos, 10,width=1)
         pygame.display.flip()
-        # self.clock.tick(60)
+
 
 '''主程序接口'''
 def game(player_num,team_agent_list=None,player_agent_list=None):
