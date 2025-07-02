@@ -47,9 +47,12 @@ class DiscGame:
             self.clock.tick(60)
             self.mainloop()
             time.sleep(0.01)
+
+    def check_movement(self,event):
+        pass
+
     def mainloop(self):                     #主循环
         # 发布当前游戏状态
-
         self.event_bus.publish(self.game_state)
         self.DiscUI.draw_new_state(self.game_state)            #绘制界面
 
@@ -212,19 +215,19 @@ class UI:                                       #可视化类
             if eve.type == pygame.QUIT:
                 pygame.quit()
         self.screen.fill('green')
-        pygame.draw.rect(self.screen,(104,202,255),self.score_loc[0])  #得分区1
+        pygame.draw.rect(self.screen,(104,202,255),self .score_loc[0])  #得分区1
         pygame.draw.rect(self.screen,(255,86,86),self.score_loc[1])    #得分区2
         pygame.draw.rect(self.screen, "white", (958, 0, 4, 1280))#中线
         #队员
         for team in list(event.teams.values()):
             for player in team.player_list:
-                pygame.draw.circle(self.screen,"blue" if player.team_id==1 else "red",player.pos,20)
+                pygame.draw.circle(self.screen,"blue" if player.team_id==1 else "red",player.pos,15)
         #飞碟
         pygame.draw.circle(self.screen,'yellow',event.disc.pos,10)
         pygame.draw.circle(self.screen, 'black', event.disc.pos, 10,width=1)
         pygame.display.flip()
 
-
+import sys
 '''主程序接口'''
 def game(player_num,team_agent_list=None,player_agent_list=None):
     pygame.init()                                   #初始化pygame
@@ -234,6 +237,12 @@ def game(player_num,team_agent_list=None,player_agent_list=None):
         screen,clock,
         player_num,
         team_agent_list,player_agent_list)
-    Game.start_game()                               #开始游戏
+    try:
+        Game.start_game()
+    except pygame.error:
+        pass  # 防止pygame退出时报错
+    except KeyboardInterrupt:
+        pygame.quit()
+        sys.exit()                             #开始游戏
 '''导入时自动输出注意事项'''
 print('注意事项:\n1,使用game()函数开始一局游戏\n2,game(player_num,team_agent_dict=None,player_agent_dict=None\n3,team_agent_dict={team_id=1:team_agent,team_id=2:team_agent}\n4,player_agent_disc={team_id:[player_agent1,player_agent2,...,player_agent(player_num)]})')
