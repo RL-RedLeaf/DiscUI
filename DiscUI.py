@@ -41,7 +41,9 @@ class DiscGame:
             self,None,
             {self.team1.team_id:self.player_num,self.team2.team_id:self.player_num},
             {self.team1.team_id:(0,0,60,1280),self.team2.team_id:(1860,0,60,1280)},
-            {self.team1.team_id:[[1920//2-180,1280//(self.player_num+1)*(i+1)] for i in range(self.player_num+1)],self.team2.team_id:[[1920//2+180,1280//(self.player_num+1)*(j+1)] for j in range(self.player_num+1)]}))
+            {self.team1.team_id:[[1920//2-180,1280//(self.player_num+1)*(i+1)] for i in range(self.player_num+1)],
+             self.team2.team_id:[[1920//2+180,1280//(self.player_num+1)*(j+1)] for j in range(self.player_num+1)]}
+            ))
         self.event_bus.publish(self.game_state)
         while self.running:
             self.clock.tick(60)
