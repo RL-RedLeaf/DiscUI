@@ -17,16 +17,18 @@ class DiscGame:
         #创建游戏所需实体
 
         self.game_state=GameState({1:self.team1,2:self.team2},self.disc,self.screen)
-
+        self.updated=[]#用于存放当前帧已经更新的实体 判断所有实体更新后再绘制
         self.subscribe_main_event() #订阅所需事件
 
     '''change系列函数会订阅对应的事件，接收游戏内实体的状态，以便汇总传入GameState'''
     def change_disc_state(self,event):
         print("disc update")
         self.game_state.disc= event.disc
+        self.updated.append(event.disc)
     def change_team_state(self,event):
         print("team update")
         self.game_state.teams[event.team.team_id]=event.team
+        self.updated.append(event.team)
     def change_score(self,event):
         pass
 
@@ -54,9 +56,14 @@ class DiscGame:
         pass
 
     def mainloop(self):                     #主循环
-        # 发布当前游戏状态
-        self.event_bus.publish(self.game_state)
-        self.DiscUI.draw_new_state(self.game_state)            #绘制界面
+        self.DiscUI.draw_new_state(self.game_state)  # 绘制界面
+        if len(self.updated)>=3:
+            self.event_bus.publish(self.game_state)# 发布当前游戏状态
+            self.updated=[]
+        else:
+            pass
+
+
 
 
 class Event:
@@ -170,6 +177,7 @@ class Player(Entity):                   #队员类，不与游戏主进程进行
         pass
 
 
+
 class Disc(Entity):                      #飞盘类，与游戏主线程和队员进行交互
     def __init__(self,event_bus):
         super().__init__(event_bus)
@@ -247,4 +255,7 @@ def game(player_num,team_agent_list=None,player_agent_list=None):
         pygame.quit()
         sys.exit()                             #开始游戏
 '''导入时自动输出注意事项'''
-print('注意事项:\n1,使用game()函数开始一局游戏\n2,game(player_num,team_agent_dict=None,player_agent_dict=None\n3,team_agent_dict={team_id=1:team_agent,team_id=2:team_agent}\n4,player_agent_disc={team_id:[player_agent1,player_agent2,...,player_agent(player_num)]})')
+if __name__ == "__main__":
+    pass
+else:
+    print('注意事项:\n1,使用game()函数开始一局游戏\n2,game(player_num,team_agent_dict=None,player_agent_dict=None\n3,team_agent_dict={team_id=1:team_agent,team_id=2:team_agent}\n4,player_agent_disc={team_id:[player_agent1,player_agent2,...,player_agent(player_num)]})')
