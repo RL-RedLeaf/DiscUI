@@ -8,14 +8,15 @@ class DiscGame:
         self.player_num=player_num
         self.team_agent_list=team_agent_list      #前半部分为1队，后半部分为2队
         self.player_agent_list=player_agent_list  #前半部分为1队，后半部分为2队
+
         self.running =True
+
         self.event_bus=EventBus()                 #事件总线，通过DiscGame类将事件总线分发给各类
         self.DiscUI=UI(self.event_bus,self.screen,self.clock)
         self.team1=Team(1,self.event_bus)
         self.team2=Team(2,self.event_bus)
         self.disc=Disc(self.event_bus)
         #创建游戏所需实体
-
         self.game_state=GameState({1:self.team1,2:self.team2},self.disc,self.screen)
         self.updated=[]#用于存放当前帧已经更新的实体 判断所有实体更新后再绘制
         self.subscribe_main_event() #订阅所需事件
@@ -28,13 +29,17 @@ class DiscGame:
     def change_team_state(self,event):
         print("team update")
         self.game_state.teams[event.team.team_id]=event.team
+
         self.updated.append(event.team)
+
     def change_score(self,event):
         pass
 
     def subscribe_main_event(self):
         self.event_bus.subscribe(TeamStateEvent,self.change_team_state)
+
         self.event_bus.subscribe(DiscStateEvent,self.change_disc_state)
+
 
 
     def start_game(self):                   #发布开始游戏事件，包含游戏得分区等信息，应被所有实体订阅
@@ -43,6 +48,7 @@ class DiscGame:
             self,None,
             {self.team1.team_id:self.player_num,self.team2.team_id:self.player_num},
             {self.team1.team_id:(0,0,60,1280),self.team2.team_id:(1860,0,60,1280)},
+
             {self.team1.team_id:[[1920//2-180,1280//(self.player_num+1)*(i+1)] for i in range(self.player_num+1)],
              self.team2.team_id:[[1920//2+180,1280//(self.player_num+1)*(j+1)] for j in range(self.player_num+1)]}
             ))
@@ -118,9 +124,11 @@ class PlayerActionEvent(Event):
 
 
 class TeamStateEvent(Event):
+
     def __init__(self,team,sender,target=None):
         super().__init__(sender,target)
         self.team=team
+
 
 class ScoreEvent(Event):
     pass
@@ -149,8 +157,10 @@ class Team:                             #队伍类，与队员和游戏主进程
         self.team_id=team_id
         self.event_bus=event_bus
         self.event_bus.subscribe(GameStartEvent,self.create_players)
+
         self.event_bus.subscribe(GameState,self.mainloop)
         self.running=True
+
     def team_agent(self):               #进行队伍决策
         pass
 
@@ -160,6 +170,7 @@ class Team:                             #队伍类，与队员和游戏主进程
         for i in range(num):
             self.player_list.append(Player(i,self.team_id,pos_list[i],self.event_bus,self))
         self.event_bus.publish(TeamStateEvent(self,self))
+
 
     def mainloop(self,event):                 #团队主进程，包括更新队伍状态，进行计算/决策等
         pass
@@ -188,6 +199,7 @@ class Disc(Entity):                      #飞盘类，与游戏主线程和队�
         self.running=True
     def create_disc(self,event):
         self.event_bus.publish(DiscStateEvent(self,self))
+
 
 
     def state_update(self):              #与主线程进行交互，发布state事件
@@ -220,11 +232,14 @@ class UI:                                       #可视化类
     def set_rule(self,event):                   #初始化设置绘制规则
         self.score_loc=list(event.score_loc.values())
         print("ui")
+
     def draw_new_state(self,event):             #游戏主线程中负责可视化
+
         for eve in pygame.event.get():
             if eve.type == pygame.QUIT:
                 pygame.quit()
         self.screen.fill('green')
+
         pygame.draw.rect(self.screen,(104,202,255),self .score_loc[0])  #得分区1
         pygame.draw.rect(self.screen,(255,86,86),self.score_loc[1])    #得分区2
         pygame.draw.rect(self.screen, "white", (958, 0, 4, 1280))#中线
@@ -259,3 +274,4 @@ if __name__ == "__main__":
     pass
 else:
     print('注意事项:\n1,使用game()函数开始一局游戏\n2,game(player_num,team_agent_dict=None,player_agent_dict=None\n3,team_agent_dict={team_id=1:team_agent,team_id=2:team_agent}\n4,player_agent_disc={team_id:[player_agent1,player_agent2,...,player_agent(player_num)]})')
+
