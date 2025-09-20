@@ -10,8 +10,6 @@ class DiscGame:
         self.player_agent_list=player_agent_list  #前半部分为1队，后半部分为2队
 
 
-
-
         self.running =True
 
         self.event_bus=EventBus()                 #事件总线，通过DiscGame类将事件总线分发给各类
@@ -21,6 +19,7 @@ class DiscGame:
         self.disc=Disc(self.event_bus)
         #创建游戏所需实体
         self.game_state=GameState({1:self.team1,2:self.team2},self.disc,self.screen)
+
 
         self.updated=[]#用于存放当前帧已经更新的实体 判断所有实体更新后再绘制
         self.update_timeout = 1000  # 更新超时时间（毫秒）
@@ -36,6 +35,7 @@ class DiscGame:
     def change_team_state(self,event):
         print("team update")
         self.game_state.teams[event.team.team_id]=event.team
+
         self.updated.append(event.team)
 
     def change_score(self,event):
@@ -43,6 +43,7 @@ class DiscGame:
 
     def subscribe_main_event(self):
         self.event_bus.subscribe(TeamStateEvent,self.change_team_state)
+        self.event_bus.subscribe(DiscStateEvent,self.change_disc_state)
         self.event_bus.subscribe(DiscStateEvent,self.change_disc_state)
 
 
@@ -66,6 +67,7 @@ class DiscGame:
         pass
 
     def mainloop(self):                     #主循环
+
         current_time = pygame.time.get_ticks()
         self.DiscUI.draw_new_state(self.game_state)  # 绘制界面
         if len(self.updated)>=3:
@@ -187,6 +189,7 @@ class Team:                             #队伍类，与队员和游戏主进程
     def mainloop(self,event):                 #团队主进程，包括更新队伍状态，进行计算/决策等
         self.event_bus.publish(TeamStateEvent(self, self))
 
+
 class Player(Entity):                   #队员类，不与游戏主进程进行直接交互，将信息传达至自己的team类
     def __init__(self,id,team_id,pos,event_bus,team): #id为队员编号，team_id为队伍编号
         super().__init__(event_bus)
@@ -218,7 +221,9 @@ class Disc(Entity):                      #飞盘类，与游戏主线程和队�
         pass
 
     def mainloop(self,event):                  #处理移动等信息
+
         self.event_bus.publish(DiscStateEvent(self, self))
+
 
     def state_change(self):              #与队员交互，处理状态改编事件
         pass
