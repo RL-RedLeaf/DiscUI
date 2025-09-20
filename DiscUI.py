@@ -9,6 +9,9 @@ class DiscGame:
         self.team_agent_list=team_agent_list      #前半部分为1队，后半部分为2队
         self.player_agent_list=player_agent_list  #前半部分为1队，后半部分为2队
 
+
+
+
         self.running =True
 
         self.event_bus=EventBus()                 #事件总线，通过DiscGame类将事件总线分发给各类
@@ -71,7 +74,9 @@ class DiscGame:
             self.event_bus.publish(self.game_state)# 发布当前游戏状态
             print("="*20+"tick update"+"="*20)
         elif current_time - self.last_update_time > self.update_timeout:
-            print(f"警告: 实体更新超时")
+            print(f"警告: 实体更新超时,将强制更新")
+            for i in range(3):
+                self.updated.append("Null")#使用填充物代替
             pass
         else:
             pass
