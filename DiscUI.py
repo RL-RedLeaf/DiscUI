@@ -9,7 +9,6 @@ class DiscGame:
         self.team_agent_list=team_agent_list      #前半部分为1队，后半部分为2队
         self.player_agent_list=player_agent_list  #前半部分为1队，后半部分为2队
 
-
         self.running =True
 
         self.event_bus=EventBus()                 #事件总线，通过DiscGame类将事件总线分发给各类
@@ -19,7 +18,6 @@ class DiscGame:
         self.disc=Disc(self.event_bus)
         #创建游戏所需实体
         self.game_state=GameState({1:self.team1,2:self.team2},self.disc,self.screen)
-
 
         self.updated=[]#用于存放当前帧已经更新的实体 判断所有实体更新后再绘制
         self.update_timeout = 1000  # 更新超时时间（毫秒）
@@ -35,7 +33,6 @@ class DiscGame:
     def change_team_state(self,event):
         print("team update")
         self.game_state.teams[event.team.team_id]=event.team
-
         self.updated.append(event.team)
 
     def change_score(self,event):
@@ -44,7 +41,7 @@ class DiscGame:
     def subscribe_main_event(self):
         self.event_bus.subscribe(TeamStateEvent,self.change_team_state)
         self.event_bus.subscribe(DiscStateEvent,self.change_disc_state)
-        self.event_bus.subscribe(DiscStateEvent,self.change_disc_state)
+
 
 
 
@@ -59,15 +56,14 @@ class DiscGame:
             ))
         self.event_bus.publish(self.game_state)
         while self.running:
-            self.clock.tick(60)
+            self.clock.tick(120)
             self.mainloop()
-            time.sleep(0.01)
+            time.sleep(0.006)
 
     def check_movement(self,event):
-        pass
+        return True                         #暂时不做移动检测因此直接返回true
 
     def mainloop(self):                     #主循环
-
         current_time = pygame.time.get_ticks()
         self.DiscUI.draw_new_state(self.game_state)  # 绘制界面
         if len(self.updated)>=3:
@@ -123,7 +119,9 @@ class DiscCaughtEvent(Event):
     pass
 
 class DiscMovedEvent(Event):
-    pass
+    def __init__(self,tg_pos, sender, target=None):
+        super().__init__(sender, target)
+        self.tg_pos=tg_pos
 
 class DiscStateEvent(Event):
     def __init__(self, disc, sender, target=None):
@@ -138,7 +136,6 @@ class PlayerActionEvent(Event):
 
 
 class TeamStateEvent(Event):
-
     def __init__(self,team,sender,target=None):
         super().__init__(sender,target)
         self.team=team
@@ -149,11 +146,13 @@ class ScoreEvent(Event):
 
 #开始游戏事件
 class GameStartEvent(Event):
-    def __init__(self,sender,target,team_player_num,score_loc,pos_dict):
+    def __init__(self,sender,target,team_player_num,score_loc,pos_dict,delta_time=0.016):
         super().__init__(sender,target)
         self.team_player_num=team_player_num
         self.score_loc = score_loc #得分区列表
         self.pos_dict=pos_dict
+        self.delta_time=delta_time
+
 #实体-父类，包含位置、事件总线
 class Entity:
     def __init__(self,event_bus):
@@ -161,8 +160,8 @@ class Entity:
         self.event_bus=event_bus
         pass
 
-    def move(self):                     #内置函数，用于进行移动处理/检测（待定）
-        pass
+    def _move(self,pos,tg_pos):                     #内置函数，用于进行移动检测
+        return True
 
 
 class Team:                             #队伍类，与队员和游戏主进程交互
@@ -171,12 +170,17 @@ class Team:                             #队伍类，与队员和游戏主进程
         self.team_id=team_id
         self.event_bus=event_bus
         self.event_bus.subscribe(GameStartEvent,self.create_players)
-
         self.event_bus.subscribe(GameState,self.mainloop)
         self.running=True
+        self.mode=0 #策略模式，0为进攻，1为防守
+        self.new_state=0
 
-    def team_agent(self):               #进行队伍决策
-        pass
+    def team_agent(self,event):               #进行队伍决策
+        #决定策略
+        self.mode=0
+        if self.mode==0:
+            for player in self.player_list:
+                player.agent(event)
 
     def create_players(self,event):     #num为队员数量，pos_list为包含每位队员坐标的列表。应订阅GameStartEvent
         num=event.team_player_num[self.team_id]
@@ -187,6 +191,7 @@ class Team:                             #队伍类，与队员和游戏主进程
 
 
     def mainloop(self,event):                 #团队主进程，包括更新队伍状态，进行计算/决策等
+        self.team_agent(event)
         self.event_bus.publish(TeamStateEvent(self, self))
 
 
@@ -199,7 +204,7 @@ class Player(Entity):                   #队员类，不与游戏主进程进行
         self.team=team
         pass
 
-    def agent(self):                     #队员自己的决策
+    def agent(self,event):                     #队员自己的决策
         pass
 
 
@@ -208,25 +213,38 @@ class Disc(Entity):                      #飞盘类，与游戏主线程和队�
     def __init__(self,event_bus):
         super().__init__(event_bus)
         self.pos=[1920//2,1280//2]
-        self.state=None
+        self.state=None #0:落地,1:在空中,2:被持有
+        self.holder=None #持有者
+        self.motion=[0,0]
+        self.height=0
+        self.gravity = 9.8
+        self.velocity = [0, 0, 0]  # 三维速度，由动量计算得出
+        self.mass = 1.0
         self.event_bus.subscribe(GameStartEvent,self.create_disc)
         self.event_bus.subscribe(GameState, self.mainloop)
+        self.event_bus.subscribe(DiscCaughtEvent, self.state_update)
+        self.event_bus.subscribe(DiscThrownEvent, self.state_update)
+        self.event_bus.subscribe(DiscMovedEvent, self.state_update)
         self.running=True
     def create_disc(self,event):
         self.event_bus.publish(DiscStateEvent(self,self))
 
 
-
-    def state_update(self):              #与主线程进行交互，发布state事件
+    def state_update(self,event):              #与主线程进行交互，发布state事件
+        if type(event) == DiscMovedEvent:
+            if self.state == 2 and self.holder == event.sender:
+                if self._move(self.pos,event.tg_pos):
+                    self.pos = event.tg_pos
+    def state_movement(self):
+        if self.state == 1:
+            pass
         pass
 
-    def mainloop(self,event):                  #处理移动等信息
-
+    def mainloop(self,event): #处理移动等信息
         self.event_bus.publish(DiscStateEvent(self, self))
 
 
-    def state_change(self):              #与队员交互，处理状态改编事件
-        pass
+
 
 class GameState:                         #游戏主状态，用于传达所有游戏状态，应被所有实体订阅
     def __init__(self,teams,disc:Disc,screen):
@@ -236,7 +254,15 @@ class GameState:                         #游戏主状态，用于传达所有�
 
 
 
-import pygame
+import pygame.event
+import pygame.draw
+import pygame.display
+import pygame.rect
+import pygame.time
+import pygame.color
+import pygame.key
+import pygame.surface
+
 #使用pygame进行可视化
 class UI:                                       #可视化类
     def __init__(self,event_bus,screen,clock):
@@ -251,7 +277,6 @@ class UI:                                       #可视化类
         print("ui")
 
     def draw_new_state(self,event):             #游戏主线程中负责可视化
-
         for eve in pygame.event.get():
             if eve.type == pygame.QUIT:
                 pygame.quit()
