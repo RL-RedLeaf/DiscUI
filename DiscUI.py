@@ -1,7 +1,26 @@
-import time
+import time,math
+
 
 
 class DiscGame:
+    @staticmethod
+    # 计算距离，需要标准化输入，不能应对特殊情况
+    def distance(x1, y1, x2, y2):
+        return math.sqrt(abs(x1 - x2) ** 2 + abs(y1 - y2) ** 2)
+
+    @staticmethod
+    # 用于拆分字典，需要标准化输入，不能应对特殊情况
+    def divide(dic: dict):
+        nk = list(dic.keys())
+        nv = list(dic.values())
+        former = {}
+        latter = {}
+        for i in range(len(nk) // 2):
+            former[nk.pop(0)] = nv.pop(0)
+        for j in range(len(nk)):
+            latter[nk.pop(0)] = nv.pop(0)
+        return [former, latter]
+
     def __init__(self,screen,clock,player_num,team_agent_list=None,player_agent_list=None):
         self.screen=screen
         self.clock=clock
@@ -13,8 +32,9 @@ class DiscGame:
 
         self.event_bus=EventBus()                 #事件总线，通过DiscGame类将事件总线分发给各类
         self.DiscUI=UI(self.event_bus,self.screen,self.clock)
-        self.team1=Team(1,self.event_bus)
-        self.team2=Team(2,self.event_bus)
+
+        self.team1=Team(1,self.event_bus,team_agent_list[0])
+        self.team2=Team(2,self.event_bus,team_agent_list[-1])
         self.disc=Disc(self.event_bus)
         #创建游戏所需实体
         self.game_state=GameState({1:self.team1,2:self.team2},self.disc,self.screen)
@@ -165,7 +185,7 @@ class Entity:
 
 
 class Team:                             #队伍类，与队员和游戏主进程交互
-    def __init__(self,team_id,event_bus):
+    def __init__(self,team_id,event_bus,agent=None,player_agent=None):
         self.player_list=[]
         self.team_id=team_id
         self.event_bus=event_bus
@@ -174,6 +194,8 @@ class Team:                             #队伍类，与队员和游戏主进程
         self.running=True
         self.mode=0 #策略模式，0为进攻，1为防守
         self.new_state=0
+        self.agent=agent
+        self.player_agent=player_agent
 
     def team_agent(self,event):               #进行队伍决策
         #决定策略
@@ -196,15 +218,16 @@ class Team:                             #队伍类，与队员和游戏主进程
 
 
 class Player(Entity):                   #队员类，不与游戏主进程进行直接交互，将信息传达至自己的team类
-    def __init__(self,id,team_id,pos,event_bus,team): #id为队员编号，team_id为队伍编号
+    def __init__(self,id,team_id,pos,event_bus,team,agent=None): #id为队员编号，team_id为队伍编号
         super().__init__(event_bus)
         self.id=id
         self.team_id=team_id
         self.pos=pos
         self.team=team
+        self.agent=agent
         pass
 
-    def agent(self,event):                     #队员自己的决策
+    def player_agent(self,event):                     #队员自己的决策
         pass
 
 
@@ -213,7 +236,7 @@ class Disc(Entity):                      #飞盘类，与游戏主线程和队�
     def __init__(self,event_bus):
         super().__init__(event_bus)
         self.pos=[1920//2,1280//2]
-        self.state=None #0:落地,1:在空中,2:被持有
+        self.state=None #0:落地,1:在空中,2:被持有,3:正在争夺
         self.holder=None #持有者
         self.motion=[0,0]
         self.height=0
@@ -231,16 +254,19 @@ class Disc(Entity):                      #飞盘类，与游戏主线程和队�
 
 
     def state_update(self,event):              #与主线程进行交互，发布state事件
-        if type(event) == DiscMovedEvent:
-            if self.state == 2 and self.holder == event.sender:
-                if self._move(self.pos,event.tg_pos):
-                    self.pos = event.tg_pos
-    def state_movement(self):
+        # if type(event) == DiscMovedEvent: #游戏规则持盘不可移动
+        #     if self.state == 2 and self.holder == event.sender:
+        #         if self._move(self.pos,event.tg_pos):
+        #             self.pos = event.tg_pos
+        pass
+
+    def state_movement(self):                  #物理引擎
         if self.state == 1:
             pass
         pass
 
-    def mainloop(self,event): #处理移动等信息
+    def mainloop(self,event):
+        self.state_movement()#处理移动等信息
         self.event_bus.publish(DiscStateEvent(self, self))
 
 
@@ -269,7 +295,7 @@ class UI:                                       #可视化类
         self.event_bus=event_bus
         self.screen=screen
         self.clock=clock
-        # self.event_bus.subscribe(GameState,self.draw_new_state)
+        # self.event_bus.subscribe(GameState,self.dr aw_new_state)
         self.event_bus.subscribe(GameStartEvent,self.set_rule)
 
     def set_rule(self,event):                   #初始化设置绘制规则
@@ -315,5 +341,5 @@ def game(player_num,team_agent_list=None,player_agent_list=None):
 if __name__ == "__main__":
     pass
 else:
-    print('注意事项:\n1,使用game()函数开始一局游戏\n2,game(player_num,team_agent_dict=None,player_agent_dict=None\n3,team_agent_dict={team_id=1:team_agent,team_id=2:team_agent}\n4,player_agent_disc={team_id:[player_agent1,player_agent2,...,player_agent(player_num)]})')
+    print('注意事项:\n1,使用game()函数开始一局游戏\n2,game(player_num,team_agent_list=None,player_agent_list=None\n3,team_agent_list=[team_agent1,team_agent2]\n4,player_agent_list[[player_agent11,player_agent12,...,player_agent1(player_num)],[player_agent21,player_agent22,...,player_agent2(player_num)]])')
 
