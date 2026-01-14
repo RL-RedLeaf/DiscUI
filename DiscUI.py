@@ -6,7 +6,7 @@ class DiscGame:
     @staticmethod
     # 计算距离，需要标准化输入，不能应对特殊情况
     def distance(x1, y1, x2, y2):
-        return math.sqrt(abs(x1 - x2) ** 2 + abs(y1 - y2) ** 2)
+        return ((x1 - x2) ** 2 + (y1 - y2) ** 2)**0.5
 
     @staticmethod
     # 用于拆分字典，需要标准化输入，不能应对特殊情况
@@ -21,6 +21,10 @@ class DiscGame:
             latter[nk.pop(0)] = nv.pop(0)
         return [former, latter]
 
+    def idk(self):
+        #没用，但是没这个就会报错
+        return 0
+
     def __init__(self,screen,clock,player_num,team_agent_list=None,player_agent_list=None):
         self.screen=screen
         self.clock=clock
@@ -28,13 +32,13 @@ class DiscGame:
         self.team_agent_list=team_agent_list      #前半部分为1队，后半部分为2队
         self.player_agent_list=player_agent_list  #前半部分为1队，后半部分为2队
 
-        self.running =True
+        self.running = True
 
-        self.event_bus=EventBus()                 #事件总线，通过DiscGame类将事件总线分发给各类
+        self.event_bus = EventBus()                 #事件总线，通过DiscGame类将事件总线分发给各类
         self.DiscUI=UI(self.event_bus,self.screen,self.clock)
 
-        self.team1=Team(1,self.event_bus,team_agent_list[0])
-        self.team2=Team(2,self.event_bus,team_agent_list[-1])
+        self.team1=Team(1,self.event_bus)
+        self.team2=Team(2,self.event_bus)
         self.disc=Disc(self.event_bus)
         #创建游戏所需实体
         self.game_state=GameState({1:self.team1,2:self.team2},self.disc,self.screen)
@@ -181,7 +185,8 @@ class Entity:
         pass
 
     def _move(self,pos,tg_pos):                     #内置函数，用于进行移动检测
-        return True
+        return True                                 #暂时不进行移动监测因此直接返回True
+
 
 
 class Team:                             #队伍类，与队员和游戏主进程交互
@@ -199,10 +204,11 @@ class Team:                             #队伍类，与队员和游戏主进程
 
     def team_agent(self,event):               #进行队伍决策
         #决定策略
-        self.mode=0
-        if self.mode==0:
-            for player in self.player_list:
-                player.agent(event)
+        # self.mode=0
+        # if self.mode==0:
+        #     for player in self.player_list:
+        #         player.agent(event)
+        pass
 
     def create_players(self,event):     #num为队员数量，pos_list为包含每位队员坐标的列表。应订阅GameStartEvent
         num=event.team_player_num[self.team_id]
