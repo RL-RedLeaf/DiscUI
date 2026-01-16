@@ -51,11 +51,11 @@ class DiscGame:
 
     '''change系列函数会订阅对应的事件，接收游戏内实体的状态，以便汇总传入GameState'''
     def change_disc_state(self,event):
-        print("disc update")
+        # print("disc update")
         self.game_state.disc= event.disc
         self.updated.append(event.disc)
     def change_team_state(self,event):
-        print("team update")
+        # print("team update")
         self.game_state.teams[event.team.team_id]=event.team
         self.updated.append(event.team)
 
@@ -94,7 +94,7 @@ class DiscGame:
             self.updated = []
             self.last_update_time = current_time
             self.event_bus.publish(self.game_state)# 发布当前游戏状态
-            print("="*20+"tick update"+"="*20)
+            # print("="*20+"tick update"+"="*20)
         elif current_time - self.last_update_time > self.update_timeout:
             print(f"警告: 实体更新超时,将强制更新")
             for i in range(3):
@@ -242,13 +242,13 @@ class Disc(Entity):                      #飞盘类，与游戏主线程和队�
     def __init__(self,event_bus):
         super().__init__(event_bus)
         self.pos=[1920//2,1280//2]
-        self.state=None #0:落地,1:在空中,2:被持有,3:正在争夺
+        self.state=1 #0:落地,1:在空中,2:被持有,3:正在争夺
         self.holder=None #持有者
-        self.motion=[0,0]
-        self.height=0
+        # self.motion=[0,0]     # 我发现这个量似乎没什么用，先留着（
+        self.height=10   
         self.gravity = 9.8
-        self.velocity = [0, 0, 0]  # 三维速度，由动量计算得出
-        self.mass = 1.0
+        self.velocity = [300, 0, 0]  # 三维速度:[x,y,h]
+        # self.mass = 1.0       # 我发现这个量似乎没什么用，先留着（
         self.event_bus.subscribe(GameStartEvent,self.create_disc)
         self.event_bus.subscribe(GameState, self.mainloop)
         self.event_bus.subscribe(DiscCaughtEvent, self.state_update)
@@ -256,6 +256,7 @@ class Disc(Entity):                      #飞盘类，与游戏主线程和队�
         self.event_bus.subscribe(DiscMovedEvent, self.state_update)
         self.running=True
     def create_disc(self,event):
+        self.delta_time = event.delta_time
         self.event_bus.publish(DiscStateEvent(self,self))
 
 
@@ -268,7 +269,21 @@ class Disc(Entity):                      #飞盘类，与游戏主线程和队�
 
     def state_movement(self):                  #物理引擎
         if self.state == 1:
-            pass
+            # 应用重力
+            self.velocity[2] -= self.gravity * self.delta_time
+            # 更新位置
+            self.pos[0] += self.velocity[0] * self.delta_time
+            self.pos[1] += self.velocity[1] * self.delta_time
+            self.height += self.velocity[2] * self.delta_time
+            
+            # 落地检测
+            if self.height <= 0:
+                # print(f"飞盘落地：三维速度([x,y,h]){self.velocity} \n 位置([x,y]):{self.pos} \n 高度:{self.height}")
+                self.state = 0  # 落地状态
+                self.height = 0
+                self.velocity = [0, 0, 0]
+            
+            # print(f"飞盘物理引擎-状态更新：\n 三维速度([x,y,h]){self.velocity} \n 位置([x,y]):{self.pos} \n 高度:{self.height}")
         pass
 
     def mainloop(self,event):
@@ -306,7 +321,7 @@ class UI:                                       #可视化类
 
     def set_rule(self,event):                   #初始化设置绘制规则
         self.score_loc=list(event.score_loc.values())
-        print("ui")
+        print("ui_init")
 
     def draw_new_state(self,event):             #游戏主线程中负责可视化
         for eve in pygame.event.get():

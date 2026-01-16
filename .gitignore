@@ -4,6 +4,7 @@ __pycache__/
 *$py.class
 .idea
 tester.py
+task.MD
 
 # C extensions
 *.so
