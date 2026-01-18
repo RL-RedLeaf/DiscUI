@@ -1,3 +1,3 @@
 import DiscUI
 
-DiscUI.game(4)
+DiscUI.game(2)

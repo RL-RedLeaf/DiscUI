@@ -74,9 +74,10 @@ class DiscGame:
         self.event_bus.publish(GameStartEvent(
             self,None,
             {self.team1.team_id:self.player_num,self.team2.team_id:self.player_num},
-            {self.team1.team_id:(0,0,60,1280),self.team2.team_id:(1860,0,60,1280)},
-            {self.team1.team_id:[[1920//2-180,1280//(self.player_num+1)*(i+1)] for i in range(self.player_num+1)],
-             self.team2.team_id:[[1920//2+180,1280//(self.player_num+1)*(j+1)] for j in range(self.player_num+1)]}
+            {self.team1.team_id:(0,0,60,self.screen.get_height()),self.team2.team_id:(self.screen.get_width()-60,0,60,self.screen.get_height())},
+            {self.team1.team_id:[[self.screen.get_width()//2-180,self.screen.get_height()//(self.player_num+1)*(i+1)] for i in range(self.player_num+1)],
+             self.team2.team_id:[[self.screen.get_width()//2+180,self.screen.get_height()//(self.player_num+1)*(j+1)] for j in range(self.player_num+1)]}
+            ,self.screen
             ))
         self.event_bus.publish(self.game_state)
         while self.running:
@@ -137,12 +138,31 @@ class EventBus:
 #state系列事件应被传输给DiscGame类
 #其余事件为不同实体之间传输
 class DiscThrownEvent(Event):
-    pass
+    """
+    DiscThrownEvent 用于传递投出飞盘的信息，包含以下参数：
+    target(disc) : 目标飞盘
+    sender(player) : 投飞盘的队员
+    power([x,y,h]) : 投掷飞盘的力度, 预计直接作用于速度
+    """
+    def __init__(self, sender, target, Power:list) -> None:
+        super().__init__(sender, target)
+        self.power = Power
 
 class DiscCaughtEvent(Event):
-    pass
+    """
+    DiscCaughtEvent 用于传递接取、夺取飞盘的事件，包含以下参数：
+    target(disc) : 目标飞盘
+    sender(player) : 接取、抢夺飞盘的队员
+    """
+    def __init__(self, sender, target):
+        super().__init__(sender, target)
 
 class DiscMovedEvent(Event):
+    """
+    DiscMovedEvent 是一个不知道为什么建立的事件
+    但是在飞盘游戏中, 持有飞盘的运动员是不允许移动的
+    但是先留着, 万一后面用到了呢? 或许以后改成篮球可以用
+    """
     def __init__(self,tg_pos, sender, target=None):
         super().__init__(sender, target)
         self.tg_pos=tg_pos
@@ -170,12 +190,13 @@ class ScoreEvent(Event):
 
 #开始游戏事件
 class GameStartEvent(Event):
-    def __init__(self,sender,target,team_player_num,score_loc,pos_dict,delta_time=0.016):
+    def __init__(self,sender,target,team_player_num,score_loc,pos_dict,screen,delta_time=0.016):
         super().__init__(sender,target)
         self.team_player_num=team_player_num
         self.score_loc = score_loc #得分区列表
         self.pos_dict=pos_dict
         self.delta_time=delta_time
+        self.screen=screen
 
 #实体-父类，包含位置、事件总线
 class Entity:
@@ -241,13 +262,14 @@ class Player(Entity):                   #队员类，不与游戏主进程进行
 class Disc(Entity):                      #飞盘类，与游戏主线程和队员进行交互
     def __init__(self,event_bus):
         super().__init__(event_bus)
-        self.pos=[1920//2,1280//2]
+        self.pos=[0,0]
         self.state=1 #0:落地,1:在空中,2:被持有,3:正在争夺
         self.holder=None #持有者
+        self.sub_holder=[]
         # self.motion=[0,0]     # 我发现这个量似乎没什么用，先留着（
-        self.height=10   
+        self.height=0   
         self.gravity = 9.8
-        self.velocity = [300, 0, 0]  # 三维速度:[x,y,h]
+        self.velocity = [0, 0, 0]  # 三维速度:[x,y,h]
         # self.mass = 1.0       # 我发现这个量似乎没什么用，先留着（
         self.event_bus.subscribe(GameStartEvent,self.create_disc)
         self.event_bus.subscribe(GameState, self.mainloop)
@@ -255,16 +277,33 @@ class Disc(Entity):                      #飞盘类，与游戏主线程和队�
         self.event_bus.subscribe(DiscThrownEvent, self.state_update)
         self.event_bus.subscribe(DiscMovedEvent, self.state_update)
         self.running=True
+
     def create_disc(self,event):
         self.delta_time = event.delta_time
+        self.screen=event.screen
+        self.pos=[self.screen.get_width()//2,self.screen.get_height()//2]
         self.event_bus.publish(DiscStateEvent(self,self))
 
 
-    def state_update(self,event):              #与主线程进行交互，发布state事件
+    def state_update(self,event):              #与主线程进行交互，处理state事件
         # if type(event) == DiscMovedEvent: #游戏规则持盘不可移动
         #     if self.state == 2 and self.holder == event.sender:
         #         if self._move(self.pos,event.tg_pos):
         #             self.pos = event.tg_pos
+
+        if type(event) == DiscThrownEvent:  #投掷飞盘.jpg
+            if self.state == 2 and self.holder == event.sender:
+                if self._check_movement(event.power):
+                    self.velocity[0] += event.power[0]
+                    self.velocity[1] += event.power[1]
+                    self.velocity[2] += event.power[2]
+
+        if type(event) == DiscCaughtEvent:  #投掷飞盘.jpg
+            if self.state != 2:
+                if self._check_catch(event):
+                    self.state = 3
+                    self.sub_holder.append(event.sender)
+
         pass
 
     def state_movement(self):                  #物理引擎
@@ -275,7 +314,10 @@ class Disc(Entity):                      #飞盘类，与游戏主线程和队�
             self.pos[0] += self.velocity[0] * self.delta_time
             self.pos[1] += self.velocity[1] * self.delta_time
             self.height += self.velocity[2] * self.delta_time
-            
+            # 边界检测
+            self.pos[0] = max(0, min(self.screen.get_width(), self.pos[0]))
+            self.pos[1] = max(0, min(self.screen.get_height(), self.pos[1]))
+
             # 落地检测
             if self.height <= 0:
                 # print(f"飞盘落地：三维速度([x,y,h]){self.velocity} \n 位置([x,y]):{self.pos} \n 高度:{self.height}")
@@ -284,13 +326,24 @@ class Disc(Entity):                      #飞盘类，与游戏主线程和队�
                 self.velocity = [0, 0, 0]
             
             # print(f"飞盘物理引擎-状态更新：\n 三维速度([x,y,h]){self.velocity} \n 位置([x,y]):{self.pos} \n 高度:{self.height}")
+        
+        elif self.state == 2:
+            pass    #我不管了反正希望在争夺盘的时候已经写好了速度重置代码，要不然就开摆（
+            
         pass
 
     def mainloop(self,event):
         self.state_movement()#处理移动等信息
+
+        """这里要补一个处理抢夺飞盘的逻辑, 但是空白太小写不下, 留待后人来写awa"""
+
         self.event_bus.publish(DiscStateEvent(self, self))
 
-
+    def _check_movement(power): #检测投掷飞盘合理性
+        return True
+    
+    def _check_catch(event):
+        return True
 
 
 class GameState:                         #游戏主状态，用于传达所有游戏状态，应被所有实体订阅
@@ -331,7 +384,7 @@ class UI:                                       #可视化类
 
         pygame.draw.rect(self.screen,(104,202,255),self .score_loc[0])  #得分区1
         pygame.draw.rect(self.screen,(255,86,86),self.score_loc[1])    #得分区2
-        pygame.draw.rect(self.screen, "white", (958, 0, 4, 1280))#中线
+        pygame.draw.rect(self.screen, "white", (self.screen.get_width()//2-2, 0, 4, self.screen.get_height()))#中线
         #队员
         for team in list(event.teams.values()):
             for player in team.player_list:
@@ -345,7 +398,7 @@ import sys
 '''主程序接口'''
 def game(player_num,team_agent_list=None,player_agent_list=None):
     pygame.init()                                   #初始化pygame
-    screen = pygame.display.set_mode((1920,1280))
+    screen = pygame.display.set_mode((980,640))
     clock = pygame.time.Clock()
     Game=DiscGame(                                  #创建游戏
         screen,clock,
