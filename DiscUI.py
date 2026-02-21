@@ -1,4 +1,4 @@
-import time,math
+import time,math,random
 
 
 
@@ -8,18 +8,18 @@ class DiscGame:
     def distance(x1, y1, x2, y2):
         return ((x1 - x2) ** 2 + (y1 - y2) ** 2)**0.5
 
-    @staticmethod
-    # 用于拆分字典，需要标准化输入，不能应对特殊情况
-    def divide(dic: dict):
-        nk = list(dic.keys())
-        nv = list(dic.values())
-        former = {}
-        latter = {}
-        for i in range(len(nk) // 2):
-            former[nk.pop(0)] = nv.pop(0)
-        for j in range(len(nk)):
-            latter[nk.pop(0)] = nv.pop(0)
-        return [former, latter]
+    # @staticmethod
+    # # 用于拆分字典，需要标准化输入，不能应对特殊情况
+    # def divide(dic: dict):
+    #     nk = list(dic.keys())
+    #     nv = list(dic.values())
+    #     former = {}
+    #     latter = {}
+    #     for i in range(len(nk) // 2):
+    #         former[nk.pop(0)] = nv.pop(0)
+    #     for j in range(len(nk)):
+    #         latter[nk.pop(0)] = nv.pop(0)
+    #     return [former, latter]
 
     def idk(self):
         #没用，但是没这个就会报错
@@ -185,8 +185,9 @@ class TeamStateEvent(Event):
         self.team=team
 
 class TeamModeEvent(Event):
-    def __init__(self,mode,sender,target=None):
+    def __init__(self,mode,gamestate,sender,target=None):
         super().__init__(sender,target)
+        self.gamestate=gamestate
         self.mode=mode
 
 
@@ -225,12 +226,12 @@ class Team:                             #队伍类，与队员和游戏主进程
         self.running=True
         self.mode=0 #策略模式，0为进攻，1为防守
         self.new_state=0
-        self.agent=agent
+        self.agent=TeamAgent(agent,self.event_bus)
         self.player_agent=player_agent
 
     def team_agent(self,event):               #进行队伍决策,这里接受的是gamestate的event
         self.mode = self.agent.get_mode()
-        self.event_bus.publish(TeamModeEvent(self.mode,self,self.player_list))
+        self.event_bus.publish(TeamModeEvent(self.mode,event,self,self.player_list))
 
     def create_players(self,event):     #num为队员数量，pos_list为包含每位队员坐标的列表。应订阅GameStartEvent
         num=event.team_player_num[self.team_id]
@@ -256,14 +257,15 @@ class Player(Entity):                   #队员类，不与游戏主进程进行
         self.team_id=team_id
         self.pos=pos
         self.team=team
-        self.agent=None
+        self.agent=agent
         self.event_bus.subscribe(TeamModeEvent,self.set_team_mode)
         pass
 
     def set_team_mode(self,event:TeamModeEvent):                     #队员自己的决策
         self.team_mode = event.mode
-        self.agent.inform()
-
+        self.agent.inform(event.gamestate)
+    def main(self):
+        self.agent.agent()
     def fetch(self,disc):
         self.event_bus.publish(DiscCaughtEvent(self,disc))
 
@@ -316,6 +318,7 @@ class Disc(Entity):                      #飞盘类，与游戏主线程和队�
                     self.state = 3
                     self.sub_holder.append(event.sender)
 
+
         pass
 
     def state_movement(self):                  #物理引擎
@@ -346,7 +349,10 @@ class Disc(Entity):                      #飞盘类，与游戏主线程和队�
 
     def mainloop(self,event):
         self.state_movement()#处理移动等信息
-
+        if self.state == 3:  #处理飞盘抢夺。我选择直接随机（
+            self.holder = self.sub_holder[random.randrange(0,len(self.sub_holder))]
+            self.state = 2
+            
         """这里要补一个处理抢夺飞盘的逻辑, 但是空白太小写不下, 留待后人来写awa"""
 
         self.event_bus.publish(DiscStateEvent(self, self))
@@ -408,13 +414,15 @@ class UI:                                       #可视化类
 
 
 def player_agent_tester(self,event):
-    if event.sender.team_id == self.team_id:
-        print(1)
-    else:
-        pass
+    # if event.sender.team_id == self.team_id:
+    #     print(1)
+    # else:
+    #     pass
+    pass
 def team_agent_tester(self,event):
-    print(2)
-    self.event_bus.publish(TeamModeEvent(self, self))
+    pass
+    # print(2)
+    # self.event_bus.publish(TeamModeEvent(self, self))
 
 
 class PlayerAgent:
@@ -467,14 +475,53 @@ class PlayerAgent:
             self.player.throw(self.disc,self.action['throw']['power'])
         elif 'memory_update' in self.action:
             self.memory = self.action['memory_update']
-
-        
+        else:
+            return 0    
         pass
 
+class TeamAgent:
+    def __init__(self,agent_func,event_bus):
+        self.agent_func = agent_func
+        self.event_bus = event_bus
+        self.memory = {}
 
+    def inform(self,gamestate):
+        pass
+    #     self.disc = gamestate.disc
+    #     self.information ={
+    #         'my_position': self.player.pos,
+    #         'my_team_id': self.player.team_id,
+    #         'my_id': self.player.id,
+    #         'my_memory':self.memory,
+    #         'disc': {
+    #             'position': gamestate.disc.pos,
+    #             'state': gamestate.disc.state,
+    #             'holder': gamestate.disc.holder,
+    #             'height': gamestate.disc.height,
+    #         },
+    #         'teammates': [
+    #             {'position': p.pos, 'id': p.id}
+    #             for p in gamestate.teams[self.player.team_id].player_list
+    #             if p.id != self.player.id
+    #         ],
+    #         'opponents': [
+    #             {'position': p.pos, 'id': p.id}
+    #             for p in gamestate.teams[3 - self.player.team_id].player_list  # 3-team_id得到对手队伍ID
+    #         ],
+    #         'score_zones': {
+    #             'my_zone': (0, 0, 60, gamestate.screen.get_height()) if self.player.team_id == 1 
+    #                       else (gamestate.screen.get_width()-60, 0, 60, gamestate.screen.get_height()),
+    #             'opponent_zone': (gamestate.screen.get_width()-60, 0, 60, gamestate.screen.get_height()) if self.player.team_id == 1 
+    #                             else (0, 0, 60, gamestate.screen.get_height())
+    #         }
+    #     }
+    
+    def agent(self):
+        pass
 
+    def get_mode(self):
+        return 0
 
- 
 
 
 
