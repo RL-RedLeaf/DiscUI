@@ -37,8 +37,8 @@ class DiscGame:
         self.event_bus = EventBus()                 #事件总线，通过DiscGame类将事件总线分发给各类
         self.DiscUI=UI(self.event_bus,self.screen,self.clock)
 
-        self.team1=Team(1,self.event_bus)
-        self.team2=Team(2,self.event_bus)
+        self.team1=Team(1,self.event_bus,team_agent_list[0],player_agent_list[0])
+        self.team2=Team(2,self.event_bus,team_agent_list[1],player_agent_list[1])
         self.disc=Disc(self.event_bus)
         #创建游戏所需实体
         self.game_state=GameState({1:self.team1,2:self.team2},self.disc,self.screen)
@@ -184,6 +184,11 @@ class TeamStateEvent(Event):
         super().__init__(sender,target)
         self.team=team
 
+class TeamModeEvent(Event):
+    def __init__(self,mode,sender,target=None):
+        super().__init__(sender,target)
+        self.mode=mode
+
 
 class ScoreEvent(Event):
     pass
@@ -223,23 +228,23 @@ class Team:                             #队伍类，与队员和游戏主进程
         self.agent=agent
         self.player_agent=player_agent
 
-    def team_agent(self,event):               #进行队伍决策
-        #决定策略
-        # self.mode=0
-        # if self.mode==0:
-        #     for player in self.player_list:
-        #         player.agent(event)
-        pass
+    def team_agent(self,event):               #进行队伍决策,这里接受的是gamestate的event
+        self.mode = self.agent.get_mode()
+        self.event_bus.publish(TeamModeEvent(self.mode,self,self.player_list))
 
     def create_players(self,event):     #num为队员数量，pos_list为包含每位队员坐标的列表。应订阅GameStartEvent
         num=event.team_player_num[self.team_id]
         pos_list=event.pos_dict[self.team_id]
         for i in range(num):
-            self.player_list.append(Player(i,self.team_id,pos_list[i],self.event_bus,self))
+            self.new_player = Player(i,self.team_id,pos_list[i],self.event_bus,self)
+            self.new_agent = PlayerAgent(self.player_agent[i],self.new_player,self.event_bus)
+            self.new_player.agent = self.new_agent
+            self.player_list.append(self.new_player)
         self.event_bus.publish(TeamStateEvent(self,self))
 
 
     def mainloop(self,event):                 #团队主进程，包括更新队伍状态，进行计算/决策等
+        self.agent.inform(event)
         self.team_agent(event)
         self.event_bus.publish(TeamStateEvent(self, self))
 
@@ -251,13 +256,20 @@ class Player(Entity):                   #队员类，不与游戏主进程进行
         self.team_id=team_id
         self.pos=pos
         self.team=team
-        self.agent=agent
+        self.agent=None
+        self.event_bus.subscribe(TeamModeEvent,self.set_team_mode)
         pass
 
-    def player_agent(self,event):                     #队员自己的决策
-        pass
+    def set_team_mode(self,event:TeamModeEvent):                     #队员自己的决策
+        self.team_mode = event.mode
+        self.agent.inform()
 
+    def fetch(self,disc):
+        self.event_bus.publish(DiscCaughtEvent(self,disc))
 
+    def throw(self,disc,power):
+        self.event_bus.publish(DiscThrownEvent(self,disc,power))
+    
 
 class Disc(Entity):                      #飞盘类，与游戏主线程和队员进行交互
     def __init__(self,event_bus):
@@ -394,12 +406,89 @@ class UI:                                       #可视化类
         pygame.draw.circle(self.screen, 'black', event.disc.pos, 10,width=1)
         pygame.display.flip()
 
+
+def player_agent_tester(self,event):
+    if event.sender.team_id == self.team_id:
+        print(1)
+    else:
+        pass
+def team_agent_tester(self,event):
+    print(2)
+    self.event_bus.publish(TeamModeEvent(self, self))
+
+
+class PlayerAgent:
+    def __init__(self,agent_func,player,event_bus):
+        self.agent_func = agent_func
+        self.event_bus = event_bus
+        self.player = player
+        self.memory = {}
+
+    def inform(self,gamestate):
+        self.disc = gamestate.disc
+        self.information ={
+            'my_position': self.player.pos,
+            'my_team_id': self.player.team_id,
+            'my_id': self.player.id,
+            'my_memory':self.memory,
+            'disc': {
+                'position': gamestate.disc.pos,
+                'state': gamestate.disc.state,
+                'holder': gamestate.disc.holder,
+                'height': gamestate.disc.height,
+            },
+            'teammates': [
+                {'position': p.pos, 'id': p.id}
+                for p in gamestate.teams[self.player.team_id].player_list
+                if p.id != self.player.id
+            ],
+            'opponents': [
+                {'position': p.pos, 'id': p.id}
+                for p in gamestate.teams[3 - self.player.team_id].player_list  # 3-team_id得到对手队伍ID
+            ],
+            'score_zones': {
+                'my_zone': (0, 0, 60, gamestate.screen.get_height()) if self.player.team_id == 1 
+                          else (gamestate.screen.get_width()-60, 0, 60, gamestate.screen.get_height()),
+                'opponent_zone': (gamestate.screen.get_width()-60, 0, 60, gamestate.screen.get_height()) if self.player.team_id == 1 
+                                else (0, 0, 60, gamestate.screen.get_height())
+            }
+        }
+    
+    def agent(self):
+        self.action = self.agent_func()
+        self.act()
+
+    def act(self):
+        if 'move' in self.action:
+            self.player.pos = self.action['move']
+        elif 'catch' in self.action:
+            self.player.fetch(self.disc)
+        elif 'throw' in self.action:
+            self.player.throw(self.disc,self.action['throw']['power'])
+        elif 'memory_update' in self.action:
+            self.memory = self.action['memory_update']
+
+        
+        pass
+
+
+
+
+ 
+
+
+
 import sys
 '''主程序接口'''
-def game(player_num,team_agent_list=None,player_agent_list=None):
+def game(player_num,team_agent_list=None,player_agent_list=None,testmode=False):
     pygame.init()                                   #初始化pygame
     screen = pygame.display.set_mode((980,640))
     clock = pygame.time.Clock()
+
+    if testmode:
+        player_agent_list=[[player_agent_tester for i in range(player_num)],[player_agent_tester for i in range(player_num)]]
+        team_agent_list=[team_agent_tester,team_agent_tester]
+    
     Game=DiscGame(                                  #创建游戏
         screen,clock,
         player_num,
@@ -415,5 +504,5 @@ def game(player_num,team_agent_list=None,player_agent_list=None):
 if __name__ == "__main__":
     pass
 else:
-    print('注意事项:\n1,使用game()函数开始一局游戏\n2,game(player_num,team_agent_list=None,player_agent_list=None\n3,team_agent_list=[team_agent1,team_agent2]\n4,player_agent_list[[player_agent11,player_agent12,...,player_agent1(player_num)],[player_agent21,player_agent22,...,player_agent2(player_num)]])')
+    print('注意事项:\n1,使用game()函数开始一局游戏\n2,game(player_num,team_agent_list=None,player_agent_list=None\n3,team_agent_list=[team_agent1,team_agent2]\n4,player_agent_list=[[player_agent1_1,player_agent1_2,...,player_agent1_(player_num)],[player_agent2_1,player_agent2_2,...,player_agent2_(player_num)]])')
 
