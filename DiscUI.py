@@ -226,7 +226,7 @@ class Team:                             #队伍类，与队员和游戏主进程
         self.running=True
         self.mode=0 #策略模式，0为进攻，1为防守
         self.new_state=0
-        self.agent=TeamAgent(agent,self.event_bus)
+        self.agent=agent
         self.player_agent=player_agent
 
     def team_agent(self,event):               #进行队伍决策,这里接受的是gamestate的event
@@ -237,9 +237,9 @@ class Team:                             #队伍类，与队员和游戏主进程
         num=event.team_player_num[self.team_id]
         pos_list=event.pos_dict[self.team_id]
         for i in range(num):
-            self.new_player = Player(i,self.team_id,pos_list[i],self.event_bus,self)
-            self.new_agent = PlayerAgent(self.player_agent[i],self.new_player,self.event_bus)
-            self.new_player.agent = self.new_agent
+            self.new_player = Player(i,self.team_id,pos_list[i],self.event_bus,self,self.player_agent[i])
+            self.player_agent[i].player = self.new_player
+            self.player_agent[i].event_bus = self.event_bus
             self.player_list.append(self.new_player)
         self.event_bus.publish(TeamStateEvent(self,self))
 
@@ -258,13 +258,13 @@ class Player(Entity):                   #队员类，不与游戏主进程进行
         self.pos=pos
         self.team=team
         self.agent=agent
-        self.event_bus.subscribe(TeamModeEvent,self.set_team_mode)
+        self.event_bus.subscribe(TeamModeEvent,self.main)
         pass
-
-    def set_team_mode(self,event:TeamModeEvent):                     #队员自己的决策
+    def __str__(self):
+        return f"TeamMember:{self.id} from Team:{self.team_id}"
+    def main(self,event:TeamModeEvent):                     #队员自己的决策
         self.team_mode = event.mode
         self.agent.inform(event.gamestate)
-    def main(self):
         self.agent.agent()
     def fetch(self,disc):
         self.event_bus.publish(DiscCaughtEvent(self,disc))
@@ -352,6 +352,7 @@ class Disc(Entity):                      #飞盘类，与游戏主线程和队�
         if self.state == 3:  #处理飞盘抢夺。我选择直接随机（
             self.holder = self.sub_holder[random.randrange(0,len(self.sub_holder))]
             self.state = 2
+            self.pos = self.holder.pos
             
         """这里要补一个处理抢夺飞盘的逻辑, 但是空白太小写不下, 留待后人来写awa"""
 
@@ -413,23 +414,10 @@ class UI:                                       #可视化类
         pygame.display.flip()
 
 
-def player_agent_tester(self,event):
-    # if event.sender.team_id == self.team_id:
-    #     print(1)
-    # else:
-    #     pass
-    pass
-def team_agent_tester(self,event):
-    pass
-    # print(2)
-    # self.event_bus.publish(TeamModeEvent(self, self))
-
-
-class PlayerAgent:
-    def __init__(self,agent_func,player,event_bus):
-        self.agent_func = agent_func
-        self.event_bus = event_bus
-        self.player = player
+class PlayerAgentBase:
+    def __init__(self):
+        self.event_bus = None
+        self.player = None
         self.memory = {}
 
     def inform(self,gamestate):
@@ -466,55 +454,31 @@ class PlayerAgent:
         self.action = self.agent_func()
         self.act()
 
+    def agent_func(self):
+        pass
+
     def act(self):
         if 'move' in self.action:
             self.player.pos = self.action['move']
         elif 'catch' in self.action:
             self.player.fetch(self.disc)
         elif 'throw' in self.action:
-            self.player.throw(self.disc,self.action['throw']['power'])
+            self.player.throw(self.disc,self.action['throw'])
         elif 'memory_update' in self.action:
             self.memory = self.action['memory_update']
         else:
+            print(self.player," do nothing")
             return 0    
         pass
 
-class TeamAgent:
-    def __init__(self,agent_func,event_bus):
-        self.agent_func = agent_func
-        self.event_bus = event_bus
+class TeamAgentBase:
+    def __init__(self):
+        self.agent_func = None
+        self.event_bus = None
         self.memory = {}
 
     def inform(self,gamestate):
         pass
-    #     self.disc = gamestate.disc
-    #     self.information ={
-    #         'my_position': self.player.pos,
-    #         'my_team_id': self.player.team_id,
-    #         'my_id': self.player.id,
-    #         'my_memory':self.memory,
-    #         'disc': {
-    #             'position': gamestate.disc.pos,
-    #             'state': gamestate.disc.state,
-    #             'holder': gamestate.disc.holder,
-    #             'height': gamestate.disc.height,
-    #         },
-    #         'teammates': [
-    #             {'position': p.pos, 'id': p.id}
-    #             for p in gamestate.teams[self.player.team_id].player_list
-    #             if p.id != self.player.id
-    #         ],
-    #         'opponents': [
-    #             {'position': p.pos, 'id': p.id}
-    #             for p in gamestate.teams[3 - self.player.team_id].player_list  # 3-team_id得到对手队伍ID
-    #         ],
-    #         'score_zones': {
-    #             'my_zone': (0, 0, 60, gamestate.screen.get_height()) if self.player.team_id == 1 
-    #                       else (gamestate.screen.get_width()-60, 0, 60, gamestate.screen.get_height()),
-    #             'opponent_zone': (gamestate.screen.get_width()-60, 0, 60, gamestate.screen.get_height()) if self.player.team_id == 1 
-    #                             else (0, 0, 60, gamestate.screen.get_height())
-    #         }
-    #     }
     
     def agent(self):
         pass
@@ -527,14 +491,43 @@ class TeamAgent:
 
 import sys
 '''主程序接口'''
+
+
+class PlayerAgent(PlayerAgentBase):
+    def __init__(self):
+        super().__init__()
+    def agent_func(self):
+        keys = pygame.key.get_pressed()
+        dt = 1/60
+        tgt_pos = [self.player.pos[0], self.player.pos[1]]
+        if keys[pygame.K_w]:
+            tgt_pos[1] -= 30 * dt
+        if keys[pygame.K_s]:
+            tgt_pos[1] += 30 * dt
+        if keys[pygame.K_a]:
+            tgt_pos[0] -= 30 * dt
+        if keys[pygame.K_d]:
+            tgt_pos[0] += 30 * dt
+        return {"move": tgt_pos}
+    pass
+
+class TeamAgent(TeamAgentBase):
+    def __init__(self):
+        super().__init__()
+
+    def agent(self,event):
+        pass
+
+
+
 def game(player_num,team_agent_list=None,player_agent_list=None,testmode=False):
     pygame.init()                                   #初始化pygame
     screen = pygame.display.set_mode((980,640))
     clock = pygame.time.Clock()
-
+    
     if testmode:
-        player_agent_list=[[player_agent_tester for i in range(player_num)],[player_agent_tester for i in range(player_num)]]
-        team_agent_list=[team_agent_tester,team_agent_tester]
+        player_agent_list=[[PlayerAgent() for i in range(player_num)],[PlayerAgent() for i in range(player_num)]]
+        team_agent_list=[TeamAgent(),TeamAgent()]
     
     Game=DiscGame(                                  #创建游戏
         screen,clock,
