@@ -1,25 +1,3 @@
-# DiscUI
-
-
-基于 pygame 的极限飞盘对战演示界面。通过事件总线协调游戏主循环、队伍、队员和飞盘实体，展示两个队伍的站位和飞盘位置。
-
-## 功能特点
-- 事件驱动：`EventBus` 分发团队、飞盘和全局状态事件，避免直接耦合。
-- 简易实体：`Team`、`Player` 和 `Disc` 负责各自状态更新，`GameState` 汇总后统一渲染。
-- 可视化：`UI` 使用 1920×1280 画布绘制场地、得分区、队员与飞盘。
-- 可扩展：预留 `team_agent_list` 与 `player_agent_list`，便于挂接自定义决策逻辑。
-
-## 目录
-- `DiscUI.py`：核心逻辑与事件、实体、UI 定义。
-- `main.py`：示例入口，调用 `DiscUI.game(4)` 启动 4v4。
-- `.gitignore`：常用忽略配置。
-
-## 环境要求
-- Python 3.10+
-- 依赖：`pygame`（未使用额外三方库）
-
-安装依赖：
-=======
 # DiscUI - 飞盘游戏智能体框架
 
 [![Python 3.6+](https://img.shields.io/badge/python-3.6+-blue.svg)](https://www.python.org/downloads/)
