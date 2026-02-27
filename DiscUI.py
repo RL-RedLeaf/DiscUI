@@ -308,11 +308,12 @@ class Disc(Entity):                      #飞盘类，与游戏主线程和队�
         if type(event) == DiscThrownEvent:  #投掷飞盘.jpg
             if self.state == 2 and self.holder == event.sender:
                 if self._check_movement(event.power):
+                    self.state = 1
                     self.velocity[0] += event.power[0]
                     self.velocity[1] += event.power[1]
                     self.velocity[2] += event.power[2]
 
-        if type(event) == DiscCaughtEvent:  #投掷飞盘.jpg
+        if type(event) == DiscCaughtEvent:  #抓取飞盘.jpg
             if self.state != 2:
                 if self._check_catch(event):
                     self.state = 3
@@ -352,16 +353,17 @@ class Disc(Entity):                      #飞盘类，与游戏主线程和队�
         if self.state == 3:  #处理飞盘抢夺。我选择直接随机（
             self.holder = self.sub_holder[random.randrange(0,len(self.sub_holder))]
             self.state = 2
+            print(f"飞盘被抢：{self.holder}")
             self.pos = self.holder.pos
             
         """这里要补一个处理抢夺飞盘的逻辑, 但是空白太小写不下, 留待后人来写awa"""
 
         self.event_bus.publish(DiscStateEvent(self, self))
 
-    def _check_movement(power): #检测投掷飞盘合理性
+    def _check_movement(self,power): #检测投掷飞盘合理性
         return True
     
-    def _check_catch(event):
+    def _check_catch(self,event):
         return True
 
 
@@ -460,15 +462,12 @@ class PlayerAgentBase:
     def act(self):
         if 'move' in self.action:
             self.player.pos = self.action['move']
-        elif 'catch' in self.action:
+        if 'catch' in self.action:
             self.player.fetch(self.disc)
-        elif 'throw' in self.action:
+        if 'throw' in self.action:
             self.player.throw(self.disc,self.action['throw'])
-        elif 'memory_update' in self.action:
+        if 'memory_update' in self.action:
             self.memory = self.action['memory_update']
-        else:
-            print(self.player," do nothing")
-            return 0    
         pass
 
 class TeamAgentBase:
@@ -493,25 +492,35 @@ import sys
 '''主程序接口'''
 
 
-class PlayerAgent(PlayerAgentBase):
+class ControlledPlayerAgent(PlayerAgentBase):
     def __init__(self):
         super().__init__()
     def agent_func(self):
+        action = {}
         keys = pygame.key.get_pressed()
         dt = 1/60
+        SPEED = 30
         tgt_pos = [self.player.pos[0], self.player.pos[1]]
         if keys[pygame.K_w]:
-            tgt_pos[1] -= 30 * dt
+            tgt_pos[1] -= SPEED * dt
         if keys[pygame.K_s]:
-            tgt_pos[1] += 30 * dt
+            tgt_pos[1] += SPEED * dt
         if keys[pygame.K_a]:
-            tgt_pos[0] -= 30 * dt
+            tgt_pos[0] -= SPEED * dt
         if keys[pygame.K_d]:
-            tgt_pos[0] += 30 * dt
-        return {"move": tgt_pos}
+            tgt_pos[0] += SPEED * dt
+        action['move'] = tgt_pos
+        if keys[pygame.K_q] and self.disc.holder == self.player:        
+            action['throw'] = [random.randint(-75,75),random.randint(-75,75),random.randint(10,20)]
+            print("throw",action['throw'])
+        elif keys[pygame.K_SPACE]:
+            action['catch'] = True
+            print("catch")
+                
+        return action
     pass
 
-class TeamAgent(TeamAgentBase):
+class NoTeamAgent(TeamAgentBase):
     def __init__(self):
         super().__init__()
 
@@ -520,14 +529,14 @@ class TeamAgent(TeamAgentBase):
 
 
 
-def game(player_num,team_agent_list=None,player_agent_list=None,testmode=False):
+def game(player_num,team_agent_list,player_agent_list):
     pygame.init()                                   #初始化pygame
     screen = pygame.display.set_mode((980,640))
     clock = pygame.time.Clock()
     
-    if testmode:
-        player_agent_list=[[PlayerAgent() for i in range(player_num)],[PlayerAgent() for i in range(player_num)]]
-        team_agent_list=[TeamAgent(),TeamAgent()]
+    # if testmode:
+    #     player_agent_list=[[PlayerAgent() for i in range(player_num)],[PlayerAgent() for i in range(player_num)]]
+    #     team_agent_list=[TeamAgent(),TeamAgent()]
     
     Game=DiscGame(                                  #创建游戏
         screen,clock,
