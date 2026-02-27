@@ -8,19 +8,6 @@ class DiscGame:
     def distance(x1, y1, x2, y2):
         return ((x1 - x2) ** 2 + (y1 - y2) ** 2)**0.5
 
-    # @staticmethod
-    # # 用于拆分字典，需要标准化输入，不能应对特殊情况
-    # def divide(dic: dict):
-    #     nk = list(dic.keys())
-    #     nv = list(dic.values())
-    #     former = {}
-    #     latter = {}
-    #     for i in range(len(nk) // 2):
-    #         former[nk.pop(0)] = nv.pop(0)
-    #     for j in range(len(nk)):
-    #         latter[nk.pop(0)] = nv.pop(0)
-    #     return [former, latter]
-
     def idk(self):
         #没用，但是没这个就会报错
         return 0
@@ -85,8 +72,7 @@ class DiscGame:
             self.mainloop()
             time.sleep(0.006)
 
-    def check_movement(self,event):
-        return True                         #暂时不做移动检测因此直接返回true
+
 
     def mainloop(self):                     #主循环
         current_time = pygame.time.get_ticks()
@@ -157,6 +143,16 @@ class DiscCaughtEvent(Event):
     def __init__(self, sender, target):
         super().__init__(sender, target)
 
+class DiscCaughtSuccessEvent(Event):
+    """
+    DiscCaughtEvent 用于传递接取、夺取飞盘的事件，包含以下参数：
+    target(disc) : 目标飞盘
+    sender(player) : 接取、抢夺飞盘的队员
+    """
+    def __init__(self, sender, target):
+        super().__init__(sender, target)
+
+
 class DiscMovedEvent(Event):
     """
     DiscMovedEvent 是一个不知道为什么建立的事件
@@ -211,8 +207,6 @@ class Entity:
         self.event_bus=event_bus
         pass
 
-    def _move(self,pos,tg_pos):                     #内置函数，用于进行移动检测
-        return True                                 #暂时不进行移动监测因此直接返回True
 
 
 
@@ -259,9 +253,24 @@ class Player(Entity):                   #队员类，不与游戏主进程进行
         self.team=team
         self.agent=agent
         self.event_bus.subscribe(TeamModeEvent,self.main)
-        pass
+        self.event_bus.subscribe(DiscCaughtSuccessEvent,self.set_disc)
+        self.hold_disc = None
+
     def __str__(self):
         return f"TeamMember:{self.id} from Team:{self.team_id}"
+    
+    def _move(self,pos,tg_pos):                     #内置函数，用于进行移动检测
+        # print(self,' holds ',self.hold_disc)
+        if self.hold_disc is None:
+            return True      
+        else:
+            # print(self,' holds ',self.hold_disc)
+            return False                           
+
+    def set_disc(self,event:DiscCaughtSuccessEvent):
+        if event.target == self:
+            self.hold_disc = event.sender
+
     def main(self,event:TeamModeEvent):                     #队员自己的决策
         self.team_mode = event.mode
         self.agent.inform(event.gamestate)
@@ -269,8 +278,16 @@ class Player(Entity):                   #队员类，不与游戏主进程进行
     def fetch(self,disc):
         self.event_bus.publish(DiscCaughtEvent(self,disc))
 
+    def move(self,tg_pos):
+        if self._move(self.pos,tg_pos):
+            self.pos = tg_pos
     def throw(self,disc,power):
-        self.event_bus.publish(DiscThrownEvent(self,disc,power))
+        if self.hold_disc is None:
+            return 0
+        else:
+            self.event_bus.publish(DiscThrownEvent(self,disc,power))
+            self.hold_disc = None
+
     
 
 class Disc(Entity):                      #飞盘类，与游戏主线程和队员进行交互
@@ -291,6 +308,7 @@ class Disc(Entity):                      #飞盘类，与游戏主线程和队�
         self.event_bus.subscribe(DiscThrownEvent, self.state_update)
         self.event_bus.subscribe(DiscMovedEvent, self.state_update)
         self.running=True
+
 
     def create_disc(self,event):
         self.delta_time = event.delta_time
@@ -317,8 +335,7 @@ class Disc(Entity):                      #飞盘类，与游戏主线程和队�
             if self.state != 2:
                 if self._check_catch(event):
                     self.state = 3
-                    self.sub_holder.append(event.sender)
-
+                    self.sub_holder.append(event)
 
         pass
 
@@ -350,9 +367,10 @@ class Disc(Entity):                      #飞盘类，与游戏主线程和队�
 
     def mainloop(self,event):
         self.state_movement()#处理移动等信息
-        if self.state == 3:  #处理飞盘抢夺。我选择直接随机（
-            self.holder = self.sub_holder[random.randrange(0,len(self.sub_holder))]
+        if self.state == 3:
+            self.holder = self.sub_holder[random.randrange(0,len(self.sub_holder))].sender          #处理飞盘抢夺。我选择直接随机（
             self.state = 2
+            self.event_bus.publish(DiscCaughtSuccessEvent(self,self.holder))
             print(f"飞盘被抢：{self.holder}")
             self.pos = self.holder.pos
             
@@ -461,7 +479,7 @@ class PlayerAgentBase:
 
     def act(self):
         if 'move' in self.action:
-            self.player.pos = self.action['move']
+            self.player.move(self.action['move'])
         if 'catch' in self.action:
             self.player.fetch(self.disc)
         if 'throw' in self.action:
@@ -515,7 +533,7 @@ class ControlledPlayerAgent(PlayerAgentBase):
             print("throw",action['throw'])
         elif keys[pygame.K_SPACE]:
             action['catch'] = True
-            print("catch")
+            # print("catch")
                 
         return action
     pass
