@@ -39,7 +39,6 @@ pip install pygame
 ```
 
 
-=======
 ### 基本使用
 
 创建一个简单的游戏实例：
@@ -80,34 +79,6 @@ DiscUI.game(
 | 空格键 | 尝试接住飞盘 |
 | Q键 | 投掷飞盘（需持有飞盘） |
 
-### 创建自定义玩家Agent
-
-```python
-from DiscUI import PlayerAgentBase
-
-class CustomPlayerAgent(PlayerAgentBase):
-    def agent_func(self):
-        # 获取游戏状态信息
-        disc_pos = self.information['disc']['position']
-        my_pos = self.information['my_position']
-        
-        # 简单的追逐策略
-        action = {
-            'move': [
-                my_pos[0] + (disc_pos[0] - my_pos[0]) * 0.1,
-                my_pos[1] + (disc_pos[1] - my_pos[1]) * 0.1
-            ]
-        }
-        
-        # 靠近时尝试接盘
-        if self._distance(my_pos, disc_pos) < 50:
-            action['catch'] = True
-            
-        return action
-    
-    def _distance(self, pos1, pos2):
-        return ((pos1[0] - pos2[0])**2 + (pos1[1] - pos2[1])**2)**0.5
-```
 
 ## 🏗️ 架构说明
 

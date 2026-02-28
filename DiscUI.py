@@ -8,9 +8,6 @@ class DiscGame:
     def distance(x1, y1, x2, y2):
         return ((x1 - x2) ** 2 + (y1 - y2) ** 2)**0.5
 
-    def idk(self):
-        #没用，但是没这个就会报错
-        return 0
 
     def __init__(self,screen,clock,player_num,team_agent_list=None,player_agent_list=None):
         self.screen=screen
@@ -24,11 +21,11 @@ class DiscGame:
         self.event_bus = EventBus()                 #事件总线，通过DiscGame类将事件总线分发给各类
         self.DiscUI=UI(self.event_bus,self.screen,self.clock)
 
-        self.team1=Team(1,self.event_bus,team_agent_list[0],player_agent_list[0])
-        self.team2=Team(2,self.event_bus,team_agent_list[1],player_agent_list[1])
+        self.team1=Team(0,self.event_bus,team_agent_list[0],player_agent_list[0])
+        self.team2=Team(1,self.event_bus,team_agent_list[1],player_agent_list[1])
         self.disc=Disc(self.event_bus)
         #创建游戏所需实体
-        self.game_state=GameState({1:self.team1,2:self.team2},self.disc,self.screen)
+        self.game_state=GameState({0:self.team1,1:self.team2},self.disc,self.screen)
 
         self.updated=[]#用于存放当前帧已经更新的实体 判断所有实体更新后再绘制
         self.update_timeout = 1000  # 更新超时时间（毫秒）
@@ -47,11 +44,16 @@ class DiscGame:
         self.updated.append(event.team)
 
     def change_score(self,event):
-        pass
+        self.game_state.score[event.team_id] += 1
+        print(f"得分！当前比分：{self.game_state.score}")
+        self.event_bus.publish(ResetEvent(self,None,{self.team1.team_id:[[self.screen.get_width()//2-180,self.screen.get_height()//(self.player_num+1)*(i+1)] for i in range(self.player_num+1)],
+             self.team2.team_id:[[self.screen.get_width()//2+180,self.screen.get_height()//(self.player_num+1)*(j+1)] for j in range(self.player_num+1)]},"score"))#发布重置事件，重置原因是得分
 
+        
     def subscribe_main_event(self):
         self.event_bus.subscribe(TeamStateEvent,self.change_team_state)
         self.event_bus.subscribe(DiscStateEvent,self.change_disc_state)
+        self.event_bus.subscribe(ScoreEvent,self.change_score)
 
 
 
@@ -188,7 +190,9 @@ class TeamModeEvent(Event):
 
 
 class ScoreEvent(Event):
-    pass
+    def __init__(self, sender, target, team_id):
+        super().__init__(sender, target)
+        self.team_id = team_id
 
 #开始游戏事件
 class GameStartEvent(Event):
@@ -199,6 +203,20 @@ class GameStartEvent(Event):
         self.pos_dict=pos_dict
         self.delta_time=delta_time
         self.screen=screen
+
+class ResetEvent(Event):
+    """
+    ResetEvent 用于触发游戏重置，包含以下参数：
+    sender(DiscGame) : 发送者
+    target(None) : 接收者（广播）
+    reason(str) : 重置原因（如"score"表示得分重置）
+    """
+    def __init__(self, sender, target=None,pos_dict=None, reason="score"):
+        super().__init__(sender, target)
+        self.reason = reason
+        self.pos_dict =pos_dict #重置后玩家位置列表
+
+
 
 #实体-父类，包含位置、事件总线
 class Entity:
@@ -217,12 +235,17 @@ class Team:                             #队伍类，与队员和游戏主进程
         self.event_bus=event_bus
         self.event_bus.subscribe(GameStartEvent,self.create_players)
         self.event_bus.subscribe(GameState,self.mainloop)
+        self.event_bus.subscribe(ResetEvent,self.reset)
         self.running=True
         self.mode=0 #策略模式，0为进攻，1为防守
-        self.new_state=0
         self.agent=agent
         self.player_agent=player_agent
 
+    def reset(self,event):
+        self.mode=0 #重置策略模式
+        for player in self.player_list:
+            player.pos = event.pos_dict[self.team_id][player.id]
+            player.hold_disc = None
     def team_agent(self,event):               #进行队伍决策,这里接受的是gamestate的event
         self.mode = self.agent.get_mode()
         self.event_bus.publish(TeamModeEvent(self.mode,event,self,self.player_list))
@@ -307,16 +330,29 @@ class Disc(Entity):                      #飞盘类，与游戏主线程和队�
         self.event_bus.subscribe(DiscCaughtEvent, self.state_update)
         self.event_bus.subscribe(DiscThrownEvent, self.state_update)
         self.event_bus.subscribe(DiscMovedEvent, self.state_update)
+        self.event_bus.subscribe(ResetEvent,self.reset)
         self.running=True
 
-
+    @staticmethod
+    def _inner(region,pos): #检测pos是否在region内，region格式为(x,y,w,h)
+        if region[0]<=pos[0]<=region[0]+region[2] and region[1]<=pos[1]<=region[1]+region[3]:
+            return True
+        else:
+            return False
     def create_disc(self,event):
         self.delta_time = event.delta_time
         self.screen=event.screen
         self.pos=[self.screen.get_width()//2,self.screen.get_height()//2]
+        self.score_loc = event.score_loc
         self.event_bus.publish(DiscStateEvent(self,self))
 
-
+    def reset(self,event):
+        self.pos=[self.screen.get_width()//2,self.screen.get_height()//2]
+        self.state=0
+        self.holder=None
+        self.sub_holder=[]
+        self.height=0   
+        self.velocity = [0, 0, 0]  # 三维速度:[x,y,h]
     def state_update(self,event):              #与主线程进行交互，处理state事件
         # if type(event) == DiscMovedEvent: #游戏规则持盘不可移动
         #     if self.state == 2 and self.holder == event.sender:
@@ -364,9 +400,18 @@ class Disc(Entity):                      #飞盘类，与游戏主线程和队�
             pass    #我不管了反正希望在争夺盘的时候已经写好了速度重置代码，要不然就开摆（
             
         pass
+    
+    def score_check(self):
+        if self._inner(self.score_loc[0],self.pos):  #进入1队得分区
+            self.event_bus.publish(ScoreEvent(self,None,1))
+        elif self._inner(self.score_loc[1],self.pos):  #进入0队得分区
+            self.event_bus.publish(ScoreEvent(self,None,0))
+        else:
+            pass
 
     def mainloop(self,event):
         self.state_movement()#处理移动等信息
+        self.score_check()#处理得分
         if self.state == 3:
             self.holder = self.sub_holder[random.randrange(0,len(self.sub_holder))].sender          #处理飞盘抢夺。我选择直接随机（
             self.state = 2
@@ -390,6 +435,7 @@ class GameState:                         #游戏主状态，用于传达所有�
         self.teams=teams
         self.disc=disc
         self.screen=screen
+        self.score={0:0,1:0}
 
 
 
@@ -408,6 +454,7 @@ class UI:                                       #可视化类
         self.event_bus=event_bus
         self.screen=screen
         self.clock=clock
+        self.font = pygame.font.SysFont('SimHei',40,bold=True) # 系统字体
         # self.event_bus.subscribe(GameState,self.dr aw_new_state)
         self.event_bus.subscribe(GameStartEvent,self.set_rule)
 
@@ -427,10 +474,14 @@ class UI:                                       #可视化类
         #队员
         for team in list(event.teams.values()):
             for player in team.player_list:
-                pygame.draw.circle(self.screen,"blue" if player.team_id==1 else "red",player.pos,15)
+                pygame.draw.circle(self.screen,"blue" if player.team_id==0 else "red",player.pos,15)
         #飞碟
         pygame.draw.circle(self.screen,'yellow',event.disc.pos,10)
         pygame.draw.circle(self.screen, 'black', event.disc.pos, 10,width=1)
+        
+        self.score_text_surface = self.font.render(f"{event.score[0]}  {event.score[1]}", True, (0,0,0))
+        self.screen.blit(self.score_text_surface, (self.screen.get_width()//2 - self.score_text_surface.get_width()//2, 10))
+
         pygame.display.flip()
 
 
@@ -460,7 +511,7 @@ class PlayerAgentBase:
             ],
             'opponents': [
                 {'position': p.pos, 'id': p.id}
-                for p in gamestate.teams[3 - self.player.team_id].player_list  # 3-team_id得到对手队伍ID
+                for p in gamestate.teams[1 - self.player.team_id].player_list  # 1-team_id得到对手队伍ID
             ],
             'score_zones': {
                 'my_zone': (0, 0, 60, gamestate.screen.get_height()) if self.player.team_id == 1 

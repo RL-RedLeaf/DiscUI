@@ -5,6 +5,8 @@ __pycache__/
 .idea
 tester.py
 task.MD
+test*
+agent_examples.py
 
 # C extensions
 *.so
