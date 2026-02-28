@@ -5,8 +5,8 @@ import time,math,random
 class DiscGame:
     @staticmethod
     # 计算距离，需要标准化输入，不能应对特殊情况
-    def distance(x1, y1, x2, y2):
-        return ((x1 - x2) ** 2 + (y1 - y2) ** 2)**0.5
+    def distance(x1, y1, x2, y2, dh=0):
+        return ((x1 - x2) ** 2 + (y1 - y2) ** 2 + dh ** 2)**0.5
 
 
     def __init__(self,screen,clock,player_num,team_agent_list=None,player_agent_list=None):
@@ -144,6 +144,7 @@ class DiscCaughtEvent(Event):
     """
     def __init__(self, sender, target):
         super().__init__(sender, target)
+
 
 class DiscCaughtSuccessEvent(Event):
     """
@@ -427,7 +428,10 @@ class Disc(Entity):                      #飞盘类，与游戏主线程和队�
         return True
     
     def _check_catch(self,event):
-        return True
+        if DiscGame.distance(self.pos[0],self.pos[1],event.sender.pos[0],event.sender.pos[1],self.height)<=30:
+            return True
+        else:
+            return False
 
 
 class GameState:                         #游戏主状态，用于传达所有游戏状态，应被所有实体订阅
