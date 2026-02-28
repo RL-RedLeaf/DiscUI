@@ -5,8 +5,8 @@ import time,math,random
 class DiscGame:
     @staticmethod
     # 计算距离，需要标准化输入，不能应对特殊情况
-    def distance(x1, y1, x2, y2, dh=0):
-        return ((x1 - x2) ** 2 + (y1 - y2) ** 2 + dh ** 2)**0.5
+    def distance(x1, y1, x2, y2,):
+        return ((x1 - x2) ** 2 + (y1 - y2) ** 2)**0.5
 
 
     def __init__(self,screen,clock,player_num,team_agent_list=None,player_agent_list=None):
@@ -304,11 +304,15 @@ class Player(Entity):                   #队员类，不与游戏主进程进行
 
     def move(self,tg_pos):
         if self._move(self.pos,tg_pos):
+            for i in range(len(tg_pos)):
+                tg_pos[i] += (random.random() - 0.5) * 2 #增加随机扰动
             self.pos = tg_pos
     def throw(self,disc,power):
         if self.hold_disc is None:
             return 0
         else:
+            for i in range(len(power)):
+                power[i] *= random.uniform(0.7, 1.3) #增加随机扰动
             self.event_bus.publish(DiscThrownEvent(self,disc,power))
             self.hold_disc = None
 
@@ -363,14 +367,17 @@ class Disc(Entity):                      #飞盘类，与游戏主线程和队�
         if type(event) == DiscThrownEvent:  #投掷飞盘.jpg
             if self.state == 2 and self.holder == event.sender:
                 if self._check_movement(event.power):
+                    print(f"飞盘投掷：{event.sender},位置{event.sender.pos},投掷力度{event.power}")
                     self.state = 1
                     self.velocity[0] += event.power[0]
                     self.velocity[1] += event.power[1]
                     self.velocity[2] += event.power[2]
+                    self.height += 3 #投掷时飞盘会有一个初始高度，防止被自己投出的飞盘砸到（
 
         if type(event) == DiscCaughtEvent:  #抓取飞盘.jpg
             if self.state != 2:
                 if self._check_catch(event):
+                    print(f"飞盘争抢：{event.sender},位置{event.sender.pos},飞盘位置{self.pos},飞盘高度{self.height},距离{DiscGame.distance(self.pos[0],self.pos[1],event.sender.pos[0],event.sender.pos[1])}")
                     self.state = 3
                     self.sub_holder.append(event)
 
@@ -428,7 +435,7 @@ class Disc(Entity):                      #飞盘类，与游戏主线程和队�
         return True
     
     def _check_catch(self,event):
-        if DiscGame.distance(self.pos[0],self.pos[1],event.sender.pos[0],event.sender.pos[1],self.height)<=30:
+        if DiscGame.distance(self.pos[0],self.pos[1],event.sender.pos[0],event.sender.pos[1])<=30 and self.height<=2:
             return True
         else:
             return False

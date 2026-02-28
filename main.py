@@ -1,6 +1,9 @@
 import DiscUI
 from DiscUI import ControlledPlayerAgent,NoTeamAgent
 
+
+
+
 player_num=2
 
 player_agent_list=[[ControlledPlayerAgent() for i in range(player_num)],[ControlledPlayerAgent() for i in range(player_num)]]
