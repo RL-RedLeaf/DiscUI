@@ -230,7 +230,7 @@ class Entity:
 
 
 class Team:                             #队伍类，与队员和游戏主进程交互
-    def __init__(self,team_id,event_bus,agent=None,player_agent=None):
+    def __init__(self,team_id,event_bus,agent,player_agent):
         self.player_list=[]
         self.team_id=team_id
         self.event_bus=event_bus
@@ -238,10 +238,13 @@ class Team:                             #队伍类，与队员和游戏主进程
         self.event_bus.subscribe(GameState,self.mainloop)
         self.event_bus.subscribe(ResetEvent,self.reset)
         self.running=True
-        self.mode=0 #策略模式，0为进攻，1为防守
+        self.mode=0 #策略模式
         self.agent=agent
+        self.agent.team = self
+        self.agent.event_bus = self.event_bus
         self.player_agent=player_agent
 
+    
     def reset(self,event):
         self.mode=0 #重置策略模式
         for player in self.player_list:
@@ -258,8 +261,11 @@ class Team:                             #队伍类，与队员和游戏主进程
             self.new_player = Player(i,self.team_id,pos_list[i],self.event_bus,self,self.player_agent[i])
             self.player_agent[i].player = self.new_player
             self.player_agent[i].event_bus = self.event_bus
+            self.player_agent[i].init()#玩家智能体初始化
             self.player_list.append(self.new_player)
+        self.agent.init()#队伍智能体初始化
         self.event_bus.publish(TeamStateEvent(self,self))
+
 
 
     def mainloop(self,event):                 #团队主进程，包括更新队伍状态，进行计算/决策等
@@ -502,13 +508,19 @@ class PlayerAgentBase:
         self.player = None
         self.memory = {}
 
+    def init(self):
+        pass
+
+
     def inform(self,gamestate):
         self.disc = gamestate.disc
+        self.event_bus = self.player.event_bus
         self.information ={
-            'my_position': self.player.pos,
+            'my_position': self.player.pos.copy(),
             'my_team_id': self.player.team_id,
             'my_id': self.player.id,
             'my_memory':self.memory,
+            'hold_disc': False if self.player.hold_disc is None else True,
             'disc': {
                 'position': gamestate.disc.pos,
                 'state': gamestate.disc.state,
@@ -529,7 +541,8 @@ class PlayerAgentBase:
                           else (gamestate.screen.get_width()-60, 0, 60, gamestate.screen.get_height()),
                 'opponent_zone': (gamestate.screen.get_width()-60, 0, 60, gamestate.screen.get_height()) if self.player.team_id == 1 
                                 else (0, 0, 60, gamestate.screen.get_height())
-            }
+            },
+            'score': gamestate.score.copy()
         }
     
     def agent(self):
@@ -548,16 +561,47 @@ class PlayerAgentBase:
             self.player.throw(self.disc,self.action['throw'])
         if 'memory_update' in self.action:
             self.memory = self.action['memory_update']
-        pass
+
+
 
 class TeamAgentBase:
     def __init__(self):
         self.agent_func = None
         self.event_bus = None
+        self.team = None
         self.memory = {}
 
-    def inform(self,gamestate):
+    def init(self):
         pass
+
+    def inform(self,gamestate):
+        self.disc = gamestate.disc
+        self.event_bus = self.team.event_bus
+        self.information ={
+            'my_team_id': self.team.team_id,
+            'my_memory':self.memory,
+            'disc': {
+                'position': gamestate.disc.pos,
+                'state': gamestate.disc.state,
+                'holder': gamestate.disc.holder,
+                'height': gamestate.disc.height,
+            },
+            'teammates': [
+                {'position': p.pos, 'id': p.id}
+                for p in gamestate.teams[self.team.team_id].player_list
+            ],
+            'opponents': [
+                {'position': p.pos, 'id': p.id}
+                for p in gamestate.teams[1 - self.team.team_id].player_list  # 1-team_id得到对手队伍ID
+            ],
+            'score_zones': {
+                'my_zone': (0, 0, 60, gamestate.screen.get_height()) if self.team.team_id == 1 
+                          else (gamestate.screen.get_width()-60, 0, 60, gamestate.screen.get_height()),
+                'opponent_zone': (gamestate.screen.get_width()-60, 0, 60, gamestate.screen.get_height()) if self.team.team_id == 1 
+                                else (0, 0, 60, gamestate.screen.get_height())
+            },
+            'score': gamestate.score.copy()
+        }
     
     def agent(self):
         pass

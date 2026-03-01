@@ -1,8 +1,8 @@
-# DiscUI Agent 开发完全指南 🎯
+# DiscUI Agent 开发完全指南
 
 欢迎来到 DiscUI 飞盘游戏智能体开发世界！本指南将带你从零开始学习如何开发自己的飞盘游戏AI智能体。
 
-## 📚 目录
+## 目录
 
 - [第一章：基础知识准备](#第一章基础知识准备)
 - [第二章：理解游戏机制](#第二章理解游戏机制)
@@ -95,6 +95,7 @@ information = {
     'my_position': [x, y],           # 你的当前位置 [横坐标, 纵坐标]
     'my_team_id': 0,                 # 你的队伍ID (0=蓝队, 1=红队)
     'my_id': 0,                      # 你在队伍中的编号
+    'hold_disc': None                # 你当前持有的飞盘对象 (不持有飞盘则为None)
     'disc': {                        # 飞盘信息
         'position': [x, y],          # 飞盘当前位置
         'state': 1,                  # 飞盘状态 (0=落地,1=空中,2=持有,3=争夺)
@@ -798,9 +799,10 @@ Opponents: {len(info['opponents'])}
         self.log_file.flush()
     
     def _log_action(self, action):
-        """记录动作日志"""
+        """记录执行的动作"""
         log_msg = f"Action taken: {action}\n"
         self.log_file.write(log_msg)
+        self.log_file.flush()
 ```
 
 ### 7.2 性能优化
@@ -825,256 +827,178 @@ class OptimizedAgent(PlayerAgentBase):
         # 缓存结果
         self.cache[cache_key] = result
         
-        # 清理旧缓存（保持最近100个）
+        # 限制缓存大小
         if len(self.cache) > 100:
-            oldest_key = next(iter(self.cache))
-            del self.cache[oldest_key]
-        
+            self.cache.pop(next(iter(self.cache)))
+            
         return result
     
     def _generate_cache_key(self):
         """生成缓存键"""
-        # 基于不变的信息生成键
+        # 基于游戏状态生成唯一键
         disc_pos = tuple(self.information['disc']['position'])
         my_pos = tuple(self.information['my_position'])
         return (disc_pos, my_pos)
-```
-
-### 7.3 测试框架
-
-```python
-class TestableAgent(PlayerAgentBase):
-    def __init__(self):
-        super().__init__()
-        self.test_mode = False
-        self.test_scenarios = []
-    
-    def run_tests(self):
-        """运行预定义测试场景"""
-        test_cases = [
-            self._test_basic_movement,
-            self._test_catching_logic,
-            self._test_throwing_accuracy
-        ]
-        
-        results = []
-        for test_func in test_cases:
-            try:
-                result = test_func()
-                results.append(('PASS', test_func.__name__, result))
-            except Exception as e:
-                results.append(('FAIL', test_func.__name__, str(e)))
-        
-        return results
-    
-    def _test_basic_movement(self):
-        """测试基本移动逻辑"""
-        # 模拟游戏状态
-        mock_info = {
-            'my_position': [100, 100],
-            'disc': {'position': [200, 200]},
-            # ... 其他必要信息
-        }
-        
-        self.information = mock_info
-        action = self.agent_func()
-        
-        # 验证动作合理性
-        assert 'move' in action
-        assert len(action['move']) == 2
-        return "Movement test passed"
 ```
 
 ---
 
 ## 第八章：实战案例分析
 
-### 8.1 完整的竞技级Agent
+### 8.1 成功案例：区域控制策略
 
 ```python
-class ChampionshipAgent(PlayerAgentBase):
+class ZoneControlAgent(PlayerAgentBase):
+    """区域控制型Agent，专注于占据关键位置"""
+    
     def __init__(self):
         super().__init__()
-        self.strategy_selector = StrategySelector()
-        self.path_planner = PathPlanner()
-        self.risk_assessor = RiskAssessor()
+        self.key_zones = []
+        self.current_zone = None
         
     def agent_func(self):
-        # 1. 情况评估
-        situation = self._assess_situation()
+        # 确定当前应该控制的区域
+        target_zone = self._select_key_zone()
         
-        # 2. 策略选择
-        strategy = self.strategy_selector.choose(situation)
+        # 移动到目标区域
+        if target_zone:
+            action = {'move': [target_zone[0], target_zone[1]]}
+            
+            # 如果在区域内且有机会接盘
+            if self._in_zone(target_zone) and self._can_catch():
+                action['catch'] = True
+                
+            return action
         
-        # 3. 路径规划
-        path = self.path_planner.plan(strategy, self.information)
-        
-        # 4. 风险评估
-        risk_level = self.risk_assessor.evaluate(strategy, situation)
-        
-        # 5. 执行动作
-        action = self._execute_strategy(strategy, path, risk_level)
-        
-        return action
+        # 默认行为
+        return {'move': self.information['disc']['position']}
     
-    def _assess_situation(self):
-        """全面评估场上情况"""
-        return {
-            'score_difference': self._get_score_diff(),
-            'time_remaining': self._get_time_left(),
-            'disc_control': self._whos_controlling_disc(),
-            'field_position': self._get_field_advantage(),
-            'player_states': self._get_player_conditions()
-        }
-
-class StrategySelector:
-    """策略选择器"""
-    def choose(self, situation):
-        if situation['score_difference'] < -2:
-            return 'aggressive_offense'  # 大幅落后，激进进攻
-        elif situation['score_difference'] > 2:
-            return 'conservative_defense'  # 领先，保守防守
-        elif situation['time_remaining'] < 30:
-            return 'urgent_offense'  # 时间紧迫，紧急进攻
-        else:
-            return 'balanced_play'  # 平衡打法
-
-class PathPlanner:
-    """路径规划器"""
-    def plan(self, strategy, information):
-        if strategy == 'aggressive_offense':
-            return self._direct_attack_path(information)
-        elif strategy == 'conservative_defense':
-            return self._safe_defensive_position(information)
-        else:
-            return self._optimal_positioning(information)
-
-class RiskAssessor:
-    """风险评估器"""
-    def evaluate(self, strategy, situation):
-        base_risk = self._base_risk(strategy)
-        situational_modifier = self._situation_modifier(situation)
-        return base_risk * situational_modifier
+    def _select_key_zone(self):
+        """选择最重要的控制区域"""
+        # 优先级：得分区 > 中场 > 防守区
+        zones = [
+            self.information['score_zones']['opponent_zone'],
+            (self.screen.get_width()//2, self.screen.get_height()//2, 100, 100),
+            self.information['score_zones']['my_zone']
+        ]
+        
+        # 选择最近的未被充分控制的区域
+        for zone in zones:
+            if not self._zone_controlled_by_teammates(zone):
+                return (zone[0] + zone[2]//2, zone[1] + zone[3]//2)
+                
+        return None
 ```
 
-### 8.2 团队协作案例
+### 8.2 比赛数据分析
 
 ```python
-class TournamentTeamAgent(TeamAgentBase):
+class AnalyticsAgent(PlayerAgentBase):
+    """带数据分析功能的Agent"""
+    
     def __init__(self):
         super().__init__()
-        self.game_plan = GamePlan()
-        self.tactical_coordinator = TacticalCoordinator()
-        
-    def agent(self, gamestate):
-        # 1. 执行游戏计划
-        self.game_plan.execute(gamestate)
-        
-        # 2. 战术协调
-        self.tactical_coordinator.coordinate(gamestate, self.players)
-        
-        # 3. 动态调整
-        self._dynamic_adjustments(gamestate)
-    
-    def _dynamic_adjustments(self, gamestate):
-        """根据比赛进展动态调整策略"""
-        current_score = gamestate.score
-        time_elapsed = self._get_elapsed_time()
-        
-        # 根据比分和时间调整策略强度
-        if current_score[0] - current_score[1] > 3:
-            self.game_plan.intensity = 'low'  # 领先时放松
-        elif time_elapsed > 300:  # 5分钟后
-            self.game_plan.intensity = 'high'  # 后期加强
-```
-
-### 8.3 性能监控系统
-
-```python
-class PerformanceMonitor:
-    """性能监控系统"""
-    def __init__(self, agent):
-        self.agent = agent
-        self.metrics = {
-            'decision_time': [],
-            'success_rate': 0.0,
-            'average_score_contribution': 0.0
+        self.stats = {
+            'passes_attempted': 0,
+            'passes_successful': 0,
+            'distance_covered': 0,
+            'time_with_disc': 0
         }
-    
-    def monitor_performance(self):
-        """监控Agent性能"""
-        # 记录决策时间
-        start_time = time.time()
-        action = self.agent.agent_func()
-        decision_time = time.time() - start_time
+        self.start_time = time.time()
         
-        self.metrics['decision_time'].append(decision_time)
-        
-        # 计算平均决策时间
-        if len(self.metrics['decision_time']) > 100:
-            avg_time = sum(self.metrics['decision_time'][-100:]) / 100
-            if avg_time > 0.05:  # 超过50ms
-                print(f"Warning: Decision time is high: {avg_time:.3f}s")
-        
-        return action
-
-# 使用监控包装器
-class MonitoredAgent(PlayerAgentBase):
-    def __init__(self):
-        super().__init__()
-        self.monitor = PerformanceMonitor(self)
-    
     def agent_func(self):
-        return self.monitor.monitor_performance()
+        # 收集统计数据
+        self._update_statistics()
+        
+        # 基于数据做决策
+        if self._pass_success_rate_low():
+            play_conservatively = True
+        else:
+            play_aggressively = True
+            
+        # 正常决策逻辑...
+        return self._normal_decision_logic()
+    
+    def _update_statistics(self):
+        """更新各项统计数据"""
+        # 记录传球尝试
+        if 'throw' in self.action:
+            self.stats['passes_attempted'] += 1
+            
+        # 记录成功传球
+        if (hasattr(self, '_previous_holder') and 
+            self._previous_holder != self.information['disc']['holder']):
+            self.stats['passes_successful'] += 1
+            
+        self._previous_holder = self.information['disc']['holder']
+```
+
+### 8.3 对抗性策略
+
+```python
+class CounterAgent(PlayerAgentBase):
+    """专门针对特定对手策略的反制Agent"""
+    
+    def __init__(self):
+        super().__init__()
+        self.opponent_patterns = {}
+        self.counter_strategies = {}
+        
+    def agent_func(self):
+        # 分析对手模式
+        opponent_pattern = self._analyze_opponent_behavior()
+        
+        # 选择相应的反制策略
+        counter_strategy = self._select_counter_strategy(opponent_pattern)
+        
+        # 执行反制动作
+        return self._execute_counter(counter_strategy)
+    
+    def _analyze_opponent_behavior(self):
+        """分析对手的行为模式"""
+        opponents = self.information['opponents']
+        
+        patterns = {}
+        for opponent in opponents:
+            # 分析移动模式、传球习惯等
+            movement_pattern = self._detect_movement_pattern(opponent)
+            passing_tendency = self._analyze_passing_tendency(opponent)
+            
+            patterns[opponent['id']] = {
+                'movement': movement_pattern,
+                'passing': passing_tendency
+            }
+            
+        return patterns
 ```
 
 ---
 
-## 🏆 进阶挑战
+## 附录
 
-完成基础学习后，你可以尝试这些挑战：
+### A. 常见问题解答
 
-### 初级挑战
-1. **防守专家**：创建专门擅长防守的Agent
-2. **传球大师**：实现高成功率的传球系统
-3. **位置猎手**：总是出现在最佳位置的Agent
+**Q: 如何处理多个Agent之间的协调？**
+A: 可以使用TeamAgent进行高层协调，或者让PlayerAgent通过event_bus事件总线系统间接通信。
 
-### 中级挑战
-1. **团队战术**：实现复杂的团队配合策略
-2. **适应性AI**：能够根据对手调整策略的Agent
-3. **学习型Agent**：能够在比赛中学习改进的Agent
+**Q: Agent的响应速度太慢怎么办？**
+A: 优化算法复杂度，使用缓存机制，减少不必要的计算。
 
-### 高级挑战
-1. **锦标赛级别**：创建能在比赛中获胜的顶级Agent
-2. **混合策略**：结合多种AI技术的复合型Agent
-3. **元学习系统**：能够为不同对手自动调整策略的系统
+**Q: 如何调试复杂的Agent行为？**
+A: 使用日志记录、可视化调试工具，或者实现逐步执行模式。
 
----
+### B. 最佳实践
 
-## 💡 最佳实践总结
+1. **保持代码简洁**：每个Agent应该有明确的职责
+2. **合理使用记忆系统**：避免过度依赖历史信息
+3. **注意性能优化**：复杂计算要考虑缓存和预计算
+4. **做好异常处理**：确保Agent在各种情况下都能正常工作
 
-1. **保持简单**：从简单策略开始，逐步增加复杂性
-2. **模块化设计**：将不同功能分离到独立的方法中
-3. **充分测试**：在不同场景下测试你的Agent
-4. **性能监控**：关注决策时间和资源使用
-5. **持续迭代**：基于测试结果不断改进
+### C. 进一步学习资源
 
-## 🆘 常见问题解答
-
-**Q: 我的Agent总是不动怎么办？**
-A: 检查是否正确返回了'move'动作，确认目标位置合理
-
-**Q: 如何提高传球成功率？**
-A: 考虑飞盘的物理特性，添加适当的垂直分量，预测接盘手位置
-
-**Q: 怎样实现更好的团队配合？**
-A: 使用TeamAgent协调，通过memory系统在队员间传递信息
-
-**Q: Agent运行太慢怎么办？**
-A: 优化计算逻辑，使用缓存，减少不必要的重复计算
+- 游戏AI设计模式
+- 强化学习在游戏中的应用
+- 多智能体系统协调理论
+- 实时策略游戏AI开发
 
 ---
-
-<p align="center">
-  现在你已经掌握了DiscUI Agent开发的核心技能！开始创造属于你的智能飞盘选手吧！ 🎯
-</p>

@@ -2,30 +2,30 @@
 
 [![Python 3.6+](https://img.shields.io/badge/python-3.6+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Platform](https://img.shields.io/badge/platform-windows%20%7C%20linux%20%7C%20macos-lightgrey)](https://pypi.org/project/pygame/)
+[![Platform](https://img.shields.io/badge/platform-windows%20|%20linux%20|%20macos-lightgrey)](https://pypi.org/project/pygame/)
 
 DiscUI 是一个轻量级的飞盘游戏框架，专为AI研究和智能体开发而设计。支持用户自定义编写智能体（agent），便于开发和测试不同的策略或行为逻辑。
 
-## 📋 目录
+## 目录
 
-- [✨ 特性](#-特性)
-- [🚀 快速开始](#-快速开始)
-- [🎮 使用示例](#-使用示例)
-- [🏗️ 架构说明](#️-架构说明)
-- [🔧 API参考](#-api参考)
-- [📚 开发指南](#-开发指南)
-- [🤝 贡献指南](#-贡献指南)
-- [📄 许可证](#-许可证)
+- [特性](#特性)
+- [快速开始](#快速开始)
+- [使用示例](#使用示例)
+- [架构说明](#架构说明)
+- [API参考](#api参考)
+- [开发指南](#开发指南)
+- [贡献指南](#贡献指南)
+- [许可证](#许可证)
 
-## ✨ 特性
+## 特性
 
-- 🎯 **模块化设计** - 易于扩展和定制的插件式架构
-- 🤖 **智能体支持** - 完整的Agent基类，支持自定义策略开发
-- 🎮 **可视化界面** - 基于pygame的实时游戏画面渲染
-- ⚡ **事件驱动** - 高效的发布-订阅模式实现组件间通信
-- 🔧 **灵活配置** - 支持多玩家、多队伍的自定义配置
+- 模块化设计 - 易于扩展和定制的插件式架构
+- 智能体支持 - 完整的Agent基类，支持自定义策略开发
+- 可视化界面 - 基于pygame的实时游戏画面渲染
+- 事件驱动 - 高效的发布-订阅模式实现组件间通信
+- 灵活配置 - 支持多玩家、多队伍的自定义配置
 
-## 🚀 快速开始
+## 快速开始
 
 ### 环境要求
 
@@ -37,7 +37,6 @@ DiscUI 是一个轻量级的飞盘游戏框架，专为AI研究和智能体开�
 ```bash
 pip install pygame
 ```
-
 
 ### 基本使用
 
@@ -67,7 +66,7 @@ DiscUI.game(
 )
 ```
 
-## 🎮 使用示例
+## 使用示例
 
 ### 默认控制键位
 
@@ -79,8 +78,7 @@ DiscUI.game(
 | 空格键 | 尝试接住飞盘 |
 | Q键 | 投掷飞盘（需持有飞盘） |
 
-
-## 🏗️ 架构说明
+## 架构说明
 
 ### 核心组件
 
@@ -117,7 +115,7 @@ event_bus.publish(event_object)
 | `DiscThrownEvent` | 飞盘投掷 | 玩家投掷飞盘 |
 | `DiscCaughtEvent` | 飞盘接住 | 玩家成功接住飞盘 |
 
-## 🔧 API参考
+## API参考
 
 ### 主函数
 
@@ -183,7 +181,7 @@ class MyTeamAgent(TeamAgentBase):
 }
 ```
 
-## 📚 开发指南
+## 开发指南
 
 ### 创建高级玩家策略
 
@@ -253,7 +251,7 @@ class CoordinatedTeamAgent(TeamAgentBase):
             self._set_defensive_formation(gamestate)
 ```
 
-## 🤝 贡献指南
+## 贡献指南
 
 欢迎任何形式的贡献！请遵循以下步骤：
 
@@ -286,7 +284,7 @@ pip install pygame
 - 保持代码简洁和可读性
 - 添加必要的类型提示
 
-## 📄 许可证
+## 许可证
 
 本项目采用 MIT 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情。
 
@@ -295,4 +293,3 @@ pip install pygame
 <p align="center">
   我的第一款石山代码(2026)
 </p>
-
