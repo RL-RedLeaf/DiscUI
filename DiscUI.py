@@ -1,4 +1,4 @@
-import time,math,random
+import time,random
 
 
 
@@ -34,23 +34,23 @@ class DiscGame:
         self.subscribe_main_event() #订阅所需事件
 
     '''change系列函数会订阅对应的事件，接收游戏内实体的状态，以便汇总传入GameState'''
-    def change_disc_state(self,event):
+    def change_disc_state(self,event) -> None:
         # print("disc update")
         self.game_state.disc= event.disc
         self.updated.append(event.disc)
-    def change_team_state(self,event):
+    def change_team_state(self,event) -> None:
         # print("team update")
         self.game_state.teams[event.team.team_id]=event.team
         self.updated.append(event.team)
 
-    def change_score(self,event):
+    def change_score(self,event) -> None:
         self.game_state.score[event.team_id] += 1
         print(f"得分！当前比分：{self.game_state.score}")
         self.event_bus.publish(ResetEvent(self,None,{self.team1.team_id:[[self.screen.get_width()//2-180,self.screen.get_height()//(self.player_num+1)*(i+1)] for i in range(self.player_num+1)],
              self.team2.team_id:[[self.screen.get_width()//2+180,self.screen.get_height()//(self.player_num+1)*(j+1)] for j in range(self.player_num+1)]},"score"))#发布重置事件，重置原因是得分
 
         
-    def subscribe_main_event(self):
+    def subscribe_main_event(self) -> None:
         self.event_bus.subscribe(TeamStateEvent,self.change_team_state)
         self.event_bus.subscribe(DiscStateEvent,self.change_disc_state)
         self.event_bus.subscribe(ScoreEvent,self.change_score)
@@ -132,9 +132,9 @@ class DiscThrownEvent(Event):
     sender(player) : 投飞盘的队员
     power([x,y,h]) : 投掷飞盘的力度, 预计直接作用于速度
     """
-    def __init__(self, sender, target, Power:list) -> None:
+    def __init__(self, sender, target, power:list) -> None:
         super().__init__(sender, target)
-        self.power = Power
+        self.power = power
 
 class DiscCaughtEvent(Event):
     """
@@ -251,6 +251,7 @@ class Team:                             #队伍类，与队员和游戏主进程
             player.pos = event.pos_dict[self.team_id][player.id]
             player.hold_disc = None
     def team_agent(self,event):               #进行队伍决策,这里接受的是gamestate的event
+        self.agent.agent_func()
         self.mode = self.agent.get_mode()
         self.event_bus.publish(TeamModeEvent(self.mode,event,self,self.player_list))
 
@@ -505,7 +506,7 @@ class UI:                                       #可视化类
 class PlayerAgentBase:
     def __init__(self):
         self.event_bus = None
-        self.player = None
+        self.player:Player = None
         self.memory = {}
 
     def init(self):
@@ -570,7 +571,7 @@ class TeamAgentBase:
         self.event_bus = None
         self.team = None
         self.memory = {}
-
+        self.mode = 0
     def init(self):
         pass
 
@@ -603,11 +604,14 @@ class TeamAgentBase:
             'score': gamestate.score.copy()
         }
     
-    def agent(self):
+    def agent_func(self):
         pass
 
+    def set_mode(self,mode):
+        self.mode = mode
+
     def get_mode(self):
-        return 0
+        return self.mode
 
 
 

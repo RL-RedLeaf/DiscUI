@@ -3,7 +3,7 @@ import random
 
 
 
-class SimpleAgent(PlayerAgentBase):
+class SimplePlayerAgent(PlayerAgentBase):
     '''一个非常简单的Agent示例,它会一直向飞盘移动,如果持有飞盘则向对方投掷'''
     def __init__(self):
         super().__init__()
@@ -42,16 +42,31 @@ class SimpleAgent(PlayerAgentBase):
         self.action['memory_update'] = {}
         print(f"Agent {self.player} has been reset. Memory cleared.")
 
+class SimpleTeamAgent(TeamAgentBase):
+    """简易队伍决策模型,领先就防守(0),落后就进攻(1)"""
+    def __init__(self):
+        super().__init__()
+
+    def init(self):
+        pass
+    def agent_func(self):
+        """
+        """
+        if self.information['my_score']>self.information['opponent_score']:
+            self.set_mode(0)
+        else:
+            self.set_mode(1)
+
 
 if __name__ == "__main__":
     from DiscUI import game, NoTeamAgent
     
     # 创建两个相同的简单Agent
-    agents = [SimpleAgent() for _ in range(2)]  # 4个玩家，每人一个
+    agents = [SimplePlayerAgent() for _ in range(2)]  # 4个玩家，每人一个
     
     # 启动游戏
     game(
         player_num=1,  # 每队2个玩家
-        team_agent_list=[NoTeamAgent(), NoTeamAgent()],
+        team_agent_list=[SimplePlayerAgent(), SimplePlayerAgent()],
         player_agent_list=[agents[:1], agents[1:]]  # 分配给两队
     )
