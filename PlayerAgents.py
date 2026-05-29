@@ -1,4 +1,4 @@
-from DiscUI import PlayerAgentBase,TeamAgentBase,ResetEvent
+from DiscUI import PlayerAgentBase,TeamAgentBase,ResetEvent,Player
 import random
 
 
@@ -9,6 +9,7 @@ class SimplePlayerAgent(PlayerAgentBase):
         super().__init__()
 
     def init(self):
+        self.event_bus = self.player.event_bus
         self.event_bus.subscribe(ResetEvent, self.on_reset)  # 订阅重置事件
 
     def agent_func(self):
@@ -52,14 +53,14 @@ class SimpleTeamAgent(TeamAgentBase):
     def agent_func(self):
         """
         """
-        if self.information['my_score']>self.information['opponent_score']:
+        if self.information['score'][self.information['my_team_id']]>self.information['score'][self.information["oppose_team_id"]]:
             self.set_mode(0)
         else:
             self.set_mode(1)
 
 
 if __name__ == "__main__":
-    from DiscUI import game, NoTeamAgent
+    from DiscUI import game
     
     # 创建两个相同的简单Agent
     agents = [SimplePlayerAgent() for _ in range(2)]  # 4个玩家，每人一个
@@ -67,6 +68,6 @@ if __name__ == "__main__":
     # 启动游戏
     game(
         player_num=1,  # 每队2个玩家
-        team_agent_list=[SimplePlayerAgent(), SimplePlayerAgent()],
+        team_agent_list=[SimpleTeamAgent(), SimpleTeamAgent()],
         player_agent_list=[agents[:1], agents[1:]]  # 分配给两队
     )

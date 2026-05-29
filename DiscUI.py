@@ -230,7 +230,7 @@ class Entity:
 
 
 class Team:                             #队伍类，与队员和游戏主进程交互
-    def __init__(self,team_id,event_bus,agent,player_agent):
+    def __init__(self,team_id,event_bus,agent,player_agent:list):
         self.player_list=[]
         self.team_id=team_id
         self.event_bus=event_bus
@@ -260,9 +260,10 @@ class Team:                             #队伍类，与队员和游戏主进程
         pos_list=event.pos_dict[self.team_id]
         for i in range(num):
             self.new_player = Player(i,self.team_id,pos_list[i],self.event_bus,self,self.player_agent[i])
-            self.player_agent[i].player = self.new_player
-            self.player_agent[i].event_bus = self.event_bus
-            self.player_agent[i].init()#玩家智能体初始化
+            self.new_agent = self.player_agent[i]
+            self.new_agent.player = self.new_player
+            # self.new_agent.event_bus = self.event_bus
+            self.new_agent.init()#玩家智能体初始化
             self.player_list.append(self.new_player)
         self.agent.init()#队伍智能体初始化
         self.event_bus.publish(TeamStateEvent(self,self))
@@ -311,15 +312,15 @@ class Player(Entity):                   #队员类，不与游戏主进程进行
 
     def move(self,tg_pos):
         if self._move(self.pos,tg_pos):
-            for i in range(len(tg_pos)):
-                tg_pos[i] += (random.random() - 0.5) * 2 #增加随机扰动
+            # for i in range(len(tg_pos)):
+            #     tg_pos[i] += (random.random() - 0.5) * 2 #增加随机扰动
             self.pos = tg_pos
     def throw(self,disc,power):
         if self.hold_disc is None:
             return 0
         else:
-            for i in range(len(power)):
-                power[i] *= random.uniform(0.7, 1.3) #增加随机扰动
+            # for i in range(len(power)):
+            #     power[i] *= random.uniform(0.7, 1.3) #增加随机扰动
             self.event_bus.publish(DiscThrownEvent(self,disc,power))
             self.hold_disc = None
 
@@ -380,6 +381,9 @@ class Disc(Entity):                      #飞盘类，与游戏主线程和队�
                     self.velocity[1] += event.power[1]
                     self.velocity[2] += event.power[2]
                     self.height += 3 #投掷时飞盘会有一个初始高度，防止被自己投出的飞盘砸到（
+                    self.holder = None 
+                    self.sub_holder =[] #我是傻子我怎么忘了在扔飞盘的时候清空飞盘所有者列表来着
+                    
 
         if type(event) == DiscCaughtEvent:  #抓取飞盘.jpg
             if self.state != 2:
@@ -510,12 +514,11 @@ class PlayerAgentBase:
         self.memory = {}
 
     def init(self):
-        pass
+        self.event_bus = self.player.event_bus
 
 
     def inform(self,gamestate):
         self.disc = gamestate.disc
-        self.event_bus = self.player.event_bus
         self.information ={
             'my_position': self.player.pos.copy(),
             'my_team_id': self.player.team_id,
@@ -567,19 +570,23 @@ class PlayerAgentBase:
 
 class TeamAgentBase:
     def __init__(self):
-        self.agent_func = None
+        # self.agent_func = None
         self.event_bus = None
         self.team = None
         self.memory = {}
         self.mode = 0
     def init(self):
-        pass
+        self.event_bus = self.team.event_bus
 
     def inform(self,gamestate):
         self.disc = gamestate.disc
-        self.event_bus = self.team.event_bus
+        for i in gamestate.teams.keys():
+            if gamestate.teams[i].team_id != self.team.team_id:
+                self.oppose_team = gamestate.teams[i]
+        
         self.information ={
             'my_team_id': self.team.team_id,
+            'oppose_team_id': self.oppose_team.team_id,
             'my_memory':self.memory,
             'disc': {
                 'position': gamestate.disc.pos,
@@ -654,6 +661,9 @@ class NoTeamAgent(TeamAgentBase):
 
     def agent(self,event):
         pass
+
+    # def agent_func(self):
+    #     pass
 
 
 

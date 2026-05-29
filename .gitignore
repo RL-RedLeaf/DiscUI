@@ -8,7 +8,7 @@ task.MD
 test*
 agent_examples.py
 *.mp4
-
+.tmp/
 # C extensions
 *.so
 
