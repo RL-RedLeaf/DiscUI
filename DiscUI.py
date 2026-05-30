@@ -453,7 +453,7 @@ class Disc(Entity):                      #飞盘类，与游戏主线程和队�
 
 
 class GameState:                         #游戏主状态，用于传达所有游戏状态，应被所有实体订阅
-    def __init__(self,teams,disc:Disc,screen):
+    def __init__(self,teams: list[Team], disc: Disc, screen):
         self.teams=teams
         self.disc=disc
         self.screen=screen
@@ -517,8 +517,11 @@ class PlayerAgentBase:
         self.event_bus = self.player.event_bus
 
 
-    def inform(self,gamestate):
+    def inform(self,gamestate: GameState):
         self.disc = gamestate.disc
+        for i in gamestate.teams.keys():
+            if gamestate.teams[i].team_id != self.player.team_id:
+                self.oppose_team = gamestate.teams[i]
         self.information ={
             'my_position': self.player.pos.copy(),
             'my_team_id': self.player.team_id,
@@ -538,7 +541,7 @@ class PlayerAgentBase:
             ],
             'opponents': [
                 {'position': p.pos, 'id': p.id}
-                for p in gamestate.teams[1 - self.player.team_id].player_list  # 1-team_id得到对手队伍ID
+                for p in gamestate.teams[self.oppose_team.team_id].player_list  # 1-team_id得到对手队伍ID
             ],
             'score_zones': {
                 'my_zone': (0, 0, 60, gamestate.screen.get_height()) if self.player.team_id == 1 
