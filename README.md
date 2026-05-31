@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Platform](https://img.shields.io/badge/platform-windows%20|%20linux%20|%20macos-lightgrey)](https://pypi.org/project/pygame/)
 
-DiscUI 是一个 ~~轻量级~~ 的飞盘游戏框架，专为为智能体设计（当然你要手操也没问题awa）。支持用户自定义编写智能体（agent），并可以开发和测试不同的策略或行为逻辑。
+DiscUI 是一个 **~~“轻量级”~~** 的飞盘游戏框架，专为为智能体设计（当然你要手操也没问题awa）。支持用户自定义编写智能体（agent），并可以开发和测试不同的策略或行为逻辑。
 
 ## 目录
 
