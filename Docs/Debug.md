@@ -467,3 +467,587 @@ gs.screen
 ```
 
 任何重构若触及上述接口，必须重新评估方案。
+
+---
+
+## 10. 设计细节答疑（概念补充说明）
+
+### 10.1 FrameBarrier 完整工作流程
+
+> **核心困惑**：`is_timeout()` 和 `on_frame_complete` 到底在哪被调用？怎么串起来的？
+
+FrameBarrier 本身只是**状态机 + 计时器**，不主动调用任何东西。它被外层的 `GameCoordinator.tick()` 驱动：
+
+```python
+class FrameBarrier:
+    def __init__(self, on_frame_complete, timeout_ms=1000):
+        self._phases = ["physics", "ai", "resolve", "render"]
+        self._phase_index = 0
+        self._on_complete = on_frame_complete  # ← 注册回调
+        self._timeout_ms = timeout_ms
+        self._start_time = 0
+
+    def start_frame(self):
+        """【每帧开头调用】重置计数器和计时器"""
+        self._phase_index = 0
+        self._start_time = get_ticks()
+
+    def advance_phase(self) -> bool:
+        """【每个阶段完成后调用】推进到下一阶段"""
+        self._phase_index += 1
+        if self._phase_index >= len(self._phases):
+            self._on_complete()   # ← 所有阶段走完，触发回调
+            return True           # ← 返回 True 表示整帧完成
+        return False
+
+    def current_phase(self) -> str:
+        return self._phases[self._phase_index]
+
+    def is_timeout(self) -> bool:
+        """【GameCoordinator 主动检查】当前帧是否超时"""
+        return get_ticks() - self._start_time > self._timeout_ms
+```
+
+完整的一帧流程：
+
+```python
+class GameCoordinator:
+    def __init__(self):
+        self.barrier = FrameBarrier(
+            on_frame_complete=self._on_frame_done,
+            timeout_ms=1000
+        )
+        self.frame_ready = False
+
+    def _on_frame_done(self):
+        """Barrier 所有阶段走完后自动触发"""
+        self.frame_ready = True   # 标记整帧完成
+
+    def _tick_playing(self):
+        self.barrier.start_frame()          # → phase_index=0, 记录开始时间
+        self.frame_ready = False
+
+        # ── Phase 0: 物理 ──
+        self.physics_system.update(self.disc)
+        if self.barrier.is_timeout():       # ← 主动检查：物理阶段就超了？
+            print(f"⚠ 超时: {self.barrier.current_phase()}")
+        self.barrier.advance_phase()        # → phase_index=1
+
+        # ── Phase 1: AI 决策 ──
+        snapshot = self._create_snapshot()
+        self.event_bus.publish(snapshot)    # → Agent 做决策
+        if self.barrier.is_timeout():       # ← 主动检查：AI 算太久了？
+            print(f"⚠ 超时: {self.barrier.current_phase()}")
+        self.barrier.advance_phase()        # → phase_index=2
+
+        # ── Phase 2: 裁决 ──
+        self.scoring_system.evaluate(snapshot)
+        self.catch_system.resolve(self.disc)
+        self.barrier.advance_phase()        # → phase_index=3
+
+        # ── Phase 3: 渲染 ──
+        self.renderer.draw(snapshot)
+        self.barrier.advance_phase()        # → phase_index=4 ≥ 4
+        # ↑ 内部调用 self._on_frame_done() → frame_ready=True
+
+    def run(self):
+        while self.running:
+            self._tick_playing()
+            if self.frame_ready:
+                pass  # 帧后处理
+```
+
+**`is_timeout()` 和 `on_frame_complete` 的职责：**
+
+| 钩子 | 调用者 | 时机 | 作用 |
+|------|--------|------|------|
+| `is_timeout()` | GameCoordinator（主动检查） | 每个阶段**之后** | 判断是否超时，决定是否跳过/降级 |
+| `on_frame_complete` | `advance_phase()`（自动触发） | 最后一个阶段**内部** | 通知外层整帧结束 |
+
+---
+
+### 10.2 渲染抽象：Port & Adapter 模式详解
+
+> **核心思路**：定义接口（Port），不绑定具体实现（Adapter）。
+
+#### 为什么需要
+
+现在的代码：`DiscGame.mainloop()` 里直接写死了 `self.DiscUI.draw_new_state(...)`。如果你想：
+- 换一套渲染库（pygame → pyglet）
+- 跑无头测试（headless，不渲染画面）
+
+都得改 `DiscGame`。
+
+#### 三层结构
+
+```
+┌──────────────────────┐
+│   游戏逻辑层          │  ← 只依赖 RenderPort 接口
+│   (GameCoordinator)  │
+└─────────┬────────────┘
+          │ 依赖抽象，不依赖具体
+          ▼
+┌──────────────────────┐
+│   RenderPort (接口)   │  ← 定义"能干什么"
+│   + draw(state)      │     不关心"怎么干"
+└─────────┬────────────┘
+          ├──────────────────┐
+          ▼                  ▼
+┌──────────────────┐ ┌──────────────────┐
+│ PygameRenderer   │ │ PygletRenderer   │  ← 各自实现 draw()
+│ (具体实现)        │ │ (另一个实现)      │
+└──────────────────┘ └──────────────────┘
+```
+
+#### 代码实现
+
+```python
+# ui/port.py — 抽象接口
+from abc import ABC, abstractmethod
+
+class RenderPort(ABC):
+    @abstractmethod
+    def draw(self, state: GameState):
+        pass
+```
+
+```python
+# ui/pygame_adapter.py — 具体实现
+class PygameRenderer(RenderPort):
+    def __init__(self, screen):
+        self.screen = screen
+
+    def draw(self, state: GameState):
+        self.screen.fill('green')
+        # ... 绘制所有元素
+        pygame.display.flip()
+```
+
+```python
+# GameCoordinator 只认接口，不认具体类
+class GameCoordinator:
+    def __init__(self, renderer: RenderPort):  # ← 传入接口
+        self.renderer = renderer
+
+    def tick(self):
+        # ...
+        self.renderer.draw(snapshot)  # ← 调接口，不管底下是谁
+```
+
+#### 收益
+
+```python
+# 正常启动
+game = GameCoordinator(PygameRenderer(screen))
+
+# 测试时用假的，不画任何东西
+class MockRenderer(RenderPort):
+    def draw(self, state):
+        pass  # 啥也不干
+
+game = GameCoordinator(MockRenderer())
+
+# 换渲染库，写个新 Adapter 就行
+game = GameCoordinator(PygletRenderer(screen))
+```
+
+---
+
+### 10.3 Python ABC 与 @abstractmethod
+
+**`abc`** = Abstract Base Classes（抽象基类），是 Python 标准库。作用是**强制子类实现指定方法**。
+
+#### 为什么需要
+
+假设你写框架要求所有 Agent 必须实现 `agent_func()`：
+
+```python
+class PlayerAgentBase:
+    def agent_func(self):
+        raise NotImplementedError  # 运行时才报错
+```
+
+问题：子类**忘了重写**，只有实际调用到 `agent_func()` 时才崩，可能已经跑了好久才暴露。
+
+#### ABC 方案：实例化时就报错
+
+```python
+from abc import ABC, abstractmethod
+
+class PlayerAgentBase(ABC):
+    @abstractmethod
+    def agent_func(self):
+        pass  # 没有实现体
+
+class MyAgent(PlayerAgentBase):
+    pass  # 没重写 agent_func()
+
+a = MyAgent()  # ❌ 立即报错！
+# TypeError: Can't instantiate abstract class MyAgent
+# with abstract method agent_func
+```
+
+#### 两种方式对比
+
+| 方式 | 报错时机 | 错误信息 |
+|------|---------|---------|
+| `raise NotImplementedError` | 调用该方法时 | 可能被 try 吞掉，很难排查 |
+| `@abstractmethod` | **创建对象时** | 明确告诉你哪个方法没实现 |
+
+#### 用在 RenderPort 里
+
+```python
+class RenderPort(ABC):
+    @abstractmethod
+    def draw(self, state: GameState):
+        pass
+
+class IncompleteRenderer(RenderPort):
+    pass  # 忘了写 draw()
+
+r = IncompleteRenderer()  # ❌ 立刻报错，不让创建
+```
+
+**一句话：`@abstractmethod` 把"运行时才能发现的问题"提前到"创建对象时"。**
+
+---
+
+### 10.4 `__init__.py` 的作用
+
+Python 中，目录要成为**包（package）**，通常需要 `__init__.py`。
+
+#### 核心作用
+
+**把目录变成可 import 的模块命名空间。**
+
+没有 `__init__.py`：
+
+```
+my_lib/
+├── foo.py
+└── bar.py
+```
+你只能 `import my_lib.foo`。
+
+有 `__init__.py`：
+
+```
+my_lib/
+├── __init__.py    ← 可以控制"从外面能 import 什么"
+├── foo.py
+└── bar.py
+```
+
+```python
+# my_lib/__init__.py
+from .foo import FooClass
+from .bar import bar_function
+```
+
+外面就能：
+```python
+from my_lib import FooClass        # 直接拿到，不用 my_lib.foo.FooClass
+from my_lib import bar_function
+```
+
+#### 三个典型用途
+
+| 用途 | 说明 | 示例 |
+|------|------|------|
+| **简化导入路径** | 把深层嵌套的类/函数提升到包级别 | `from pkg import X` 代替 `from pkg.sub.module import X` |
+| **控制公开接口** | 定义 `__all__`，规定 `from pkg import *` 导出什么 | `__all__ = ["Foo", "bar"]` |
+| **包初始化** | 做一次性的配置、日志设置、注册 | 在 `__init__.py` 里写初始化代码 |
+
+#### 在重构中的应用（阶段 5）
+
+重构后目录结构：
+
+```
+DiscUI/                      ← 这个目录就是最终的包
+├── __init__.py              ← 导出所有公开 API
+├── core/
+│   ├── __init__.py          ← 导出 Constants, EventBus
+│   ├── constants.py
+│   └── event_bus.py
+├── entities/
+│   ├── __init__.py          ← 导出 Disc, Player, Team
+│   ├── disc.py
+│   ├── player.py
+│   └── team.py
+├── systems/
+│   ├── __init__.py          ← 导出 PhysicsSystem, ScoringSystem...
+│   ├── physics.py
+│   ├── scoring.py
+│   └── catch.py
+├── ui/
+│   ├── __init__.py          ← 导出 RenderPort, PygameRenderer
+│   ├── port.py
+│   └── pygame_adapter.py
+└── agents/
+    ├── __init__.py          ← 导出 PlayerAgentBase, TeamAgentBase...
+    ├── base.py
+    ├── controlled.py
+    └── no_team.py
+```
+
+最顶层的 `__init__.py`：
+
+```python
+# DiscUI/__init__.py
+from .agents.base import PlayerAgentBase, TeamAgentBase
+from .agents.controlled import ControlledPlayerAgent
+from .agents.no_team import NoTeamAgent
+```
+
+用户代码**完全不变**：
+```python
+from DiscUI import PlayerAgentBase  # 和原来一模一样
+```
+
+**一句话：`__init__.py` 是包的"门面"，对外暴露什么、怎么暴露，都由它控制。**
+
+---
+
+### 10.5 游戏主类设计：两层架构
+
+游戏主类（`GameCoordinator`）需要两层设计：**高层状态机 + 底层帧 Barrier**。
+
+#### 高层状态机：控制游戏整体生命周期
+
+现在代码存在的问题：得分复位时，事件发出去各实体各自处理，但主循环还在照常跑 tick，逻辑混在一起。
+
+解决方案：引入显式的 `GamePhase`：
+
+```
+    ┌──────────┐   得分     ┌───────────┐   复位完成    ┌──────────┐
+    │ PLAYING  │ ──────→  │ RESETTING │ ────────→  │ PLAYING  │
+    │  游戏中  │           │   复位中   │            │  游戏中  │
+    └──────────┘           └───────────┘            └──────────┘
+         │
+         │ 达到分数上限
+         ▼
+    ┌──────────┐
+    │GAME_OVER │
+    │  结束    │
+    └──────────┘
+```
+
+```python
+from enum import Enum
+
+class GamePhase(Enum):
+    PLAYING = "playing"
+    RESETTING = "resetting"
+    GAME_OVER = "game_over"
+
+class GameCoordinator:
+    def __init__(self):
+        self.phase = GamePhase.PLAYING
+        self.score = {0: 0, 1: 0}
+        self.score_limit = 5
+        self.reset_timer = 0  # 复位等待帧数
+
+    def tick(self):
+        """根据当前阶段分发到不同的处理函数"""
+        if self.phase == GamePhase.PLAYING:
+            self._tick_playing()
+        elif self.phase == GamePhase.RESETTING:
+            self._tick_resetting()
+        elif self.phase == GamePhase.GAME_OVER:
+            self._tick_game_over()
+
+    def _tick_playing(self):
+        """正常游戏帧"""
+        self.barrier.start_frame()
+
+        self.physics_system.update(self.disc)
+        self.barrier.advance_phase()
+
+        snapshot = self._create_snapshot()
+        self.event_bus.publish(snapshot)
+        self.barrier.advance_phase()
+
+        self.scoring_system.evaluate(snapshot)  # 得分时调用 _on_score()
+        self.catch_system.resolve(self.disc)
+        self.barrier.advance_phase()
+
+        self.renderer.draw(snapshot)
+        self.barrier.advance_phase()
+
+    def _on_score(self, team_id):
+        """得分回调 — 切换状态"""
+        self.score[team_id] += 1
+        if max(self.score.values()) >= self.score_limit:
+            self.phase = GamePhase.GAME_OVER
+        else:
+            self.phase = GamePhase.RESETTING
+            self.reset_timer = 60  # 等 60 帧再继续
+            self.event_bus.publish(ResetEvent(...))
+
+    def _tick_resetting(self):
+        """复位阶段：等待计时归零后恢复"""
+        self.reset_timer -= 1
+        if self.reset_timer <= 0:
+            self.phase = GamePhase.PLAYING
+
+    def _tick_game_over(self):
+        """结束阶段：显示结果，退出循环"""
+        self.renderer.draw_game_over(self.score)
+        self.running = False
+```
+
+#### 两层的关系
+
+```
+GameCoordinator
+│
+├── phase: GamePhase          ← 【高层】PLAYING / RESETTING / GAME_OVER
+│     │
+│     └── tick() 按 phase 分发
+│           │
+│           └── _tick_playing()
+│                 │
+│                 ├── barrier.start_frame()      ← 【底层】帧阶段控制
+│                 ├── physics_system.update()
+│                 ├── barrier.advance_phase()
+│                 ├── snapshot = _create_snapshot()
+│                 ├── event_bus.publish(snapshot)
+│                 ├── barrier.advance_phase()
+│                 ├── scoring_system.evaluate()  ← 触发 _on_score()
+│                 ├── barrier.advance_phase()
+│                 ├── renderer.draw()
+│                 └── barrier.advance_phase()
+```
+
+**高层管"游戏在干嘛"（打/复位/结束），底层管"一帧里先干嘛后干嘛"（物理/AI/裁决/渲染）。** 互不干扰。
+
+---
+
+### 10.6 `_create_snapshot()` 实现
+
+#### 为什么需要快照
+
+现在代码直接把真实实体发给 Agent：
+
+```python
+# DiscGame.mainloop()
+self.event_bus.publish(self.game_state)  # ← 发的是真实对象
+```
+
+问题：Agent 收 `GameState` 时，物理系统可能正在更新 `disc.pos`，同一帧内不同 Agent 看到的数据不一致。
+
+#### 方案：从实体提取数据，组装成只读对象
+
+```python
+from dataclasses import dataclass
+from typing import List, Optional
+
+@dataclass(frozen=True)
+class GameSnapshot:
+    """游戏状态快照 — 不可变，一帧内固定不变"""
+
+    @dataclass(frozen=True)
+    class DiscInfo:
+        position: tuple
+        state: int
+        holder_id: Optional[int]
+        height: float
+        velocity: tuple
+
+    @dataclass(frozen=True)
+    class PlayerInfo:
+        id: int
+        team_id: int
+        position: tuple
+
+    @dataclass(frozen=True)
+    class TeamInfo:
+        team_id: int
+        players: List['PlayerInfo']
+        mode: int
+
+    disc: DiscInfo
+    teams: List[TeamInfo]
+    score: dict
+    screen_size: tuple
+
+class GameCoordinator:
+    def _create_snapshot(self) -> GameSnapshot:
+        """冻结当前时刻所有游戏数据"""
+        # 飞盘数据：list → tuple，不可变
+        disc = GameSnapshot.DiscInfo(
+            position=tuple(self.disc.pos),
+            state=self.disc.state,
+            holder_id=self.disc.holder.id if self.disc.holder else None,
+            height=self.disc.height,
+            velocity=tuple(self.disc.velocity),
+        )
+
+        # 队伍和玩家数据
+        teams = []
+        for team in [self.team1, self.team2]:
+            players = [
+                GameSnapshot.PlayerInfo(
+                    id=p.id,
+                    team_id=p.team_id,
+                    position=tuple(p.pos),
+                ) for p in team.player_list
+            ]
+            teams.append(GameSnapshot.TeamInfo(
+                team_id=team.team_id,
+                players=players,
+                mode=team.mode,
+            ))
+
+        return GameSnapshot(
+            disc=disc,
+            teams=teams,
+            score=self.score.copy(),
+            screen_size=(self.screen.get_width(), self.screen.get_height()),
+        )
+```
+
+#### 与现有 Agent 接口的兼容
+
+在 Agent 基类里把快照转回 dict，**用户代码完全不用改**：
+
+```python
+class PlayerAgentBase:
+    def inform(self, snapshot: GameSnapshot):
+        """框架调用：将快照转为 information 字典"""
+        my_team = snapshot.teams[self.player.team_id]
+        my_info = my_team.players[self.player.id]
+        opp_team = snapshot.teams[1 - self.player.team_id]
+
+        w, h = snapshot.screen_size
+        my_zone = (0, 0, 60, h) if self.player.team_id == 1 else (w - 60, 0, 60, h)
+        opp_zone = (w - 60, 0, 60, h) if self.player.team_id == 1 else (0, 0, 60, h)
+
+        self.information = {
+            'my_position': list(my_info.position),
+            'my_team_id': my_info.team_id,
+            'my_id': my_info.id,
+            'hold_disc': ...,
+            'disc': {
+                'position': list(snapshot.disc.position),
+                'state': snapshot.disc.state,
+                'holder': snapshot.disc.holder_id,
+                'height': snapshot.disc.height,
+            },
+            'teammates': [
+                {'position': list(p.position), 'id': p.id}
+                for p in my_team.players if p.id != my_info.id
+            ],
+            'opponents': [
+                {'position': list(p.position), 'id': p.id}
+                for p in opp_team.players
+            ],
+            'score_zones': {
+                'my_zone': my_zone,
+                'opponent_zone': opp_zone,
+            },
+            'score': snapshot.score.copy(),
+        }
+```
+
+**核心效果：** Agent 拿到的 `self.information` 内容不变，但数据来自**冻结快照**而非正在被修改的实体。所有 Agent 看到的是同一帧的一致数据。
