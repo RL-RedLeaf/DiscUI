@@ -4,5 +4,9 @@ from systems import GameState
 
 class RenderPort(ABC):
     @abstractmethod
+    def init(self):
+        pass
+
+    @abstractmethod
     def draw(self, state: GameState):
         pass
