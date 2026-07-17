@@ -1,3 +1,3 @@
-from Constants import Constants
+from .Constants import Constants
 
 __all__ = ['Constants']

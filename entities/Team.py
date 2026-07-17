@@ -1,45 +1,59 @@
-from events import *
-from systems import *
-from Entity import Entity
+from __future__ import annotations
 
-class Team:                             #队伍类，与队员和游戏主进程交互
-    def __init__(self,team_id,event_bus,agent,player_agent:list):
-        pass
+from .Entity import Entity
+from dataclasses import dataclass
+from config import Constants
 
+@dataclass(frozen = True)
+class PlayerKey:
+    team_id: int
+    player_id: int
     
-    def reset(self,event):
-        pass
+@dataclass(frozen = True)
+class PlayerSnap:
+    player_key: PlayerKey
+    pos: tuple[int]
+    hold_disc: bool
 
-    def team_agent(self,event):               #进行队伍决策,这里接受的是gamestate的event
-        pass
-
-    def create_players(self,event):     #num为队员数量，pos_list为包含每位队员坐标的列表。应订阅GameStartEvent
-        pass
-
-
-
-    def mainloop(self,event):                 #团队主进程，包括更新队伍状态，进行计算/决策等
-        pass
+@dataclass(frozen = True)
+class TeamSnap:
+    team_id: int
+    player_num: int
+    player_list: tuple[PlayerSnap]
 
 
 class Player(Entity):                   #队员类，不与游戏主进程进行直接交互，将信息传达至自己的team类
-    def __init__(self,id,team_id,pos,event_bus,team,agent=None): #id为队员编号，team_id为队伍编号
-        pass
+    def __init__(self,player_key: PlayerKey, pos: list[int]): #id为队员编号，team_id为队伍编号
+        super().__init__()
+        self.player_key = player_key
+        self.pos = pos
+        self.hold_disc = False
 
     def __str__(self):
-        pass
-    
-    def _move(self,pos,tg_pos):                     #内置函数，用于进行移动检测
-        pass              
+        return f'Player: {self.player_key}, pos: {self.pos}, hold_disc: {self.hold_disc}'
 
-    def set_disc(self,event:DiscCaughtSuccessEvent):
-        pass
+    def create_snap(self) -> PlayerSnap:
+        return PlayerSnap(self.player_key, tuple(self.pos), self.hold_disc)
 
-    def fetch(self,disc):
-        pass
 
-    def move(self,tg_pos):
-        pass
+class Team:                             #队伍类，与队员和游戏主进程交互
+    def __init__(self,team_id,player_num,player_agent:list):
+        self.team_id = team_id
+        self.player_num = player_num
+        self.player_agent_list = player_agent
+        self.create_players()
 
-    def throw(self,disc,power):
-        pass
+    def create_players(self):
+        self.player_peys = [PlayerKey(self.team_id,i) for i in range(self.player_num)]          #先创建身份标识
+        self.player_list = [Player(self.player_peys[i], 
+                            (Constants.BLUE_TEAM_PULL[0] if self.team_id == Constants.BLUE_TEAM_ID else Constants.RED_TEAM_PULL[0],
+                             (Constants.GAME_SIZE[1] / (self.player_num + 1)) * (i + 1) )) for i in range(self.player_num)]  #然后身份标识导入 Player
+        print(f'队伍 {self.team_id} 已创建, 队员列表: {[str(player) for player in self.player_list]}')
+        self.register_dict = {self.player_peys[i]:self.player_agent_list[i] for i in range(self.player_num)}    #最后生成 Agent 注册表
+
+    def get_register_dict(self) -> dict:
+        return self.register_dict
+
+    def create_snap(self) -> TeamSnap:
+        return TeamSnap(self.team_id, self.player_num, tuple([player.create_snap() for player in self.player_list]))
+

@@ -1,6 +1,11 @@
-# ui/port.py — 抽象接口
+from __future__ import annotations
 from abc import ABC, abstractmethod
-from systems import GameState
+from typing import TYPE_CHECKING
+
+
+if TYPE_CHECKING:
+    from systems import GameState
+
 
 class RenderPort(ABC):
     @abstractmethod
