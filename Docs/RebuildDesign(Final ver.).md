@@ -65,13 +65,12 @@ class PlayerKey:
 
 @dataclass
 class Disc:
-    disc_id: int
     pos: list[int]              #x,y,z三维坐标
     velocity: list[int]         #x,y,z三维速度
-    states: dict[str,int]       #飞盘总状态表
     state: int                  #飞盘当前状态
     holder: PlayerKey              #持盘状态下的持有者
     sub_holder: list[PlayerKey]    #潜在争夺者
+    competing_ticks: int           #争夺帧数计数
 
 @dataclass
 class Team:

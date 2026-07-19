@@ -12,14 +12,14 @@ class PlayerKey:
 @dataclass(frozen = True)
 class PlayerSnap:
     player_key: PlayerKey
-    pos: tuple[int]
+    pos: tuple[int, int]
     hold_disc: bool
 
 @dataclass(frozen = True)
 class TeamSnap:
     team_id: int
     player_num: int
-    player_list: tuple[PlayerSnap]
+    player_list: tuple
 
 
 class Player(Entity):                   #队员类，不与游戏主进程进行直接交互，将信息传达至自己的team类

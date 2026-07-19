@@ -44,7 +44,7 @@ class GameCoordinator():
         self.actions = ActionSystem()
 
         try:
-            self.render.init()
+            self.render.init(self.constants.GAME_SIZE, self.event_bus)
         except Exception as e:
             print(f'渲染器初始化失败, 错误信息: {e}')
 
@@ -59,7 +59,7 @@ class GameCoordinator():
         for team in self.teams:
             self.register_dict.update(team.get_register_dict())     #获取并合并两队队员注册表
         print(f'注册表已生成, 注册表内容: {self.register_dict}')
-        self.actions.setup(self.register_dict)                      #将注册表传入动作系统
+
 
         self.first_pull = randchoice([Constants.BLUE_TEAM_ID, Constants.RED_TEAM_ID])
         print(f'抽签选择选择  {'BLUE' if self.first_pull == Constants.BLUE_TEAM_ID else 'RED'}  队先发盘')
@@ -67,15 +67,31 @@ class GameCoordinator():
         self.disc = Disc(list(Constants.BLUE_TEAM_PULL) if self.first_pull == Constants.BLUE_TEAM_ID else list(Constants.RED_TEAM_PULL))
 
         self.gamestate = GameState(self.disc, self.teams, 1 / self.fps, self.constants, {Constants.BLUE_TEAM_ID: 0, Constants.RED_TEAM_ID: 0}, 0)
+        self.actions.setup(self.register_dict, self.gamestate)                      #将注册表传入动作系统
+        self.physics.setup(self.gamestate)
+        self.rules.setup(self.gamestate, self.states, self.event_bus)
 
-        self.event_bus.publish(GameStartEvent(self.gamestate.create_snap()))  #发布游戏状态快照事件
-
+        self.gamestate_snap = self.gamestate.create_snap()
+        self.event_bus.publish(GameStartEvent(self.gamestate_snap))  #发布游戏状态快照事件
+        
         print(f'场地就绪完成, 计划进入 PLAY 状态')
         self.pending_state.append(self.states["PLAY"])
         pass
 
     def _play(self):
-        pass
+        self.gamestate_snap = self.gamestate.create_snap()
+        self.event_bus.publish(GamePlayEvent(self.gamestate_snap))
+
+        self.actions.agent_loop(self.gamestate_snap)
+        self.actions.apply()
+
+        self.physics.apply()
+
+        pending = self.rules.apply()
+
+        if pending:
+            self.pending_state.append(pending)
+        
 
     def _pause(self):
         pass
@@ -112,13 +128,15 @@ class GameCoordinator():
 
         print("游戏结束, 进入 HALT 状态")
 
+from ui import PygameRenderPort
 
 
 
 if __name__ == "__main__":
     game = GameCoordinator(2, player_agent_list=[[None, None], [None, None]], fps=60)
+    game.set_render(PygameRenderPort(1230, 1200))
 
     # from EventMonitor import EventMonitor
-    # event_monitor = EventMonitor(event_bus=game.event_bus)  #创建事件监控器实例
+    # event_monitor = EventMonitor(event_bus=game.event_bus)  #创建事件监控器实例, 不过这玩意就调试用, 不然 play 状态得吵死
 
     game.mainloop()

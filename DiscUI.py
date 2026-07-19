@@ -686,7 +686,7 @@ def game(player_num,team_agent_list,player_agent_list):
     try:
         Game.start_game()
     except pygame.error:
-        pass  # 防止pygame退出时报错
+        print(f'ERROR:{e}')  # 防止pygame退出时报错
     except KeyboardInterrupt:
         pygame.quit()
         sys.exit()                             #开始游戏

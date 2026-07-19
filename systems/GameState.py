@@ -17,13 +17,13 @@ class GameState:
     tick: int
 
     def create_snap(self) -> GameStateSnap:
-        return GameStateSnap(self.disc.create_snap(), tuple([team.create_snap() for team in self.team_list]), self.delta_time, self.const, self.score, self.tick)
+        return GameStateSnap(self.disc.create_snap(), tuple([team.create_snap() for team in self.team_list]), self.delta_time, self.const, (self.score[self.const.BLUE_TEAM_ID],self.score[self.const.RED_TEAM_ID],), self.tick)
     
 @dataclass(frozen = True)
 class GameStateSnap:
     disc: DiscSnap
-    team_list: tuple[TeamSnap]
+    team_list: tuple
     delta_time: float
     const: Constants
-    score: dict[int, int]
+    score: tuple
     tick: int
