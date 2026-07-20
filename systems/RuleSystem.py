@@ -21,7 +21,7 @@ class RuleSystem:
         return ((pos1[0] - pos2[0]) ** 2 + (pos1[1] - pos2[1]) ** 2) ** 0.5
     
     def _inner(self, pos: list[int], area: tuple[int]):
-        return pos[0] > area[0] and pos[1] > area[1] and pos[0] < area[0] + area[2] and pos[1] < area[1] + area[3]
+        return pos[0] >= area[0] and pos[1] >= area[1] and pos[0] <= area[0] + area[2] and pos[1] <= area[1] + area[3]
 
     def apply(self):
         '''依次判定所有规则事件'''
@@ -61,6 +61,8 @@ class RuleSystem:
             
             elif self.gamestate.disc.competing_ticks <= 0:
                 self.gamestate.disc.holder_key = choice(self.gamestate.disc.sub_holder)
+                holder = self.gamestate.team_list[self.gamestate.disc.holder_key.team_id].player_list[self.gamestate.disc.holder_key.player_id]
+                holder.hold_disc = True
                 self.gamestate.disc.sub_holder = []
                 self.gamestate.disc.pos[0] = self.gamestate.team_list[self.gamestate.disc.holder_key.team_id].player_list[self.gamestate.disc.holder_key.player_id].pos[0]
                 self.gamestate.disc.pos[1] = self.gamestate.team_list[self.gamestate.disc.holder_key.team_id].player_list[self.gamestate.disc.holder_key.player_id].pos[1]

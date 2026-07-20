@@ -1,3 +1,3 @@
 from .Events import *
 
-__all__ = ['Event','GameStartEvent','GamePlayEvent','FoulEvent','DiscCatchEvent','ScoreEvent']
+__all__ = ['Event','GameStartEvent','GamePlayEvent','FoulEvent','DiscCatchEvent','ScoreEvent','ResetEvent']

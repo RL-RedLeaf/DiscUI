@@ -22,9 +22,12 @@ class GameCoordinator():
         self.event_bus = EventBus()     #由于外部可能需要使用EventBus, 因此提前创建
         self.pending_state = []
         self.render = None
+        self.foul_team_id = None
+        self.score_team_id = None
         #若要转换状态直接将状态添置到该栈末尾即可
         self._init_states()
-   
+        self.event_bus.subscribe(FoulEvent, self.on_foul_event)
+        self.event_bus.subscribe(ScoreEvent, self.on_score_event)
 
     def _init_states(self):
         self.states = State
@@ -55,7 +58,7 @@ class GameCoordinator():
         print('Start: 场地就绪中')
         self.teams = [Team(Constants.BLUE_TEAM_ID, self.player_num, self.player_agent_list[0]), Team(Constants.RED_TEAM_ID, self.player_num, self.player_agent_list[-1])]
 
-        self.register_dict = {}
+        self.register_dict: dict[PlayerKey, Player] = {}
         for team in self.teams:
             self.register_dict.update(team.get_register_dict())     #获取并合并两队队员注册表
         print(f'注册表已生成, 注册表内容: {self.register_dict}')
@@ -86,7 +89,7 @@ class GameCoordinator():
         self.actions.apply()
 
         self.physics.apply()
-
+        self.gamestate.tick += 1
         pending = self.rules.apply()
 
         if pending:
@@ -97,7 +100,72 @@ class GameCoordinator():
         pass
 
     def _reset(self):
-        pass
+        if self.foul_team_id is not None:
+            if self.foul_team_id == self.constants.BLUE_TEAM_ID:
+                self.gamestate.disc.pos = list(self.constants.RED_TEAM_PULL)
+                self.gamestate.disc.velocity = [0, 0, 0]
+                self.gamestate.disc.state = 'waiting'
+                self.gamestate.disc.holder_key = None
+                self.gamestate.disc.sub_holder = []
+                self.gamestate.disc.competing_ticks = 0
+                for team in self.teams:
+                    for player in team.player_list:
+                        player.hold_disc = False
+
+                self.pull_team = self.constants.RED_TEAM_ID
+                self.foul_team_id = None
+
+            elif self.foul_team_id == self.constants.RED_TEAM_ID:
+                self.gamestate.disc.pos = list(self.constants.BLUE_TEAM_PULL)
+                self.gamestate.disc.velocity = [0, 0, 0]
+                self.gamestate.disc.state = 'waiting'
+                self.gamestate.disc.holder_key = None
+                self.gamestate.disc.sub_holder = []
+                self.gamestate.disc.competing_ticks = 0
+                for team in self.teams:
+                    for player in team.player_list:
+                        player.hold_disc = False
+                self.pull_team = self.constants.BLUE_TEAM_ID
+                self.foul_team_id = None
+            
+        elif self.score_team_id is not None:
+            if self.score_team_id == self.constants.BLUE_TEAM_ID:
+                self.gamestate.disc.pos = list(self.constants.RED_TEAM_PULL)
+                self.gamestate.disc.velocity = [0, 0, 0]
+                self.gamestate.disc.state = 'waiting'
+                self.gamestate.disc.holder_key = None
+                self.gamestate.disc.sub_holder = []
+                self.gamestate.disc.competing_ticks = 0
+                for team in self.teams:
+                    for player in team.player_list:
+                        player.hold_disc = False
+                self.pull_team = self.constants.RED_TEAM_ID
+                self.score_team_id = None
+
+            elif self.score_team_id == self.constants.RED_TEAM_ID:
+                self.gamestate.disc.pos = list(self.constants.BLUE_TEAM_PULL)
+                self.gamestate.disc.velocity = [0, 0, 0]
+                self.gamestate.disc.state = 'waiting'
+                self.gamestate.disc.holder_key = None
+                self.gamestate.disc.sub_holder = []
+                self.gamestate.disc.competing_ticks = 0
+                for team in self.teams:
+                    for player in team.player_list:
+                        player.hold_disc = False
+                self.pull_team = self.constants.BLUE_TEAM_ID
+                self.score_team_id = None
+
+        else:
+            raise RuntimeError("reset triggered without foul or score source")
+
+        self.gamestate_snap = self.gamestate.create_snap()
+            
+        self.event_bus.publish(ResetEvent(self.pull_team, self.gamestate_snap))
+
+        self.foul_team_id = None
+        self.score_team_id = None
+
+        self.pending_state.append(self.states['PLAY'])
 
     def _trans(self, from_state, to_state) -> bool:
         return True
@@ -128,12 +196,19 @@ class GameCoordinator():
 
         print("游戏结束, 进入 HALT 状态")
 
-from ui import PygameRenderPort
 
+    def on_foul_event(self, event: FoulEvent):
+        self.foul_team_id = event.foul_team_id
+        
+    def on_score_event(self, event: ScoreEvent):
+        self.score_team_id = event.score_team_id
+
+from ui import PygameRenderPort
+from PlayerAgents import emptyPlayerAgent
 
 
 if __name__ == "__main__":
-    game = GameCoordinator(2, player_agent_list=[[None, None], [None, None]], fps=60)
+    game = GameCoordinator(2, player_agent_list=[[emptyPlayerAgent(), emptyPlayerAgent()], [emptyPlayerAgent(), emptyPlayerAgent()]], fps=60)
     game.set_render(PygameRenderPort(1230, 1200))
 
     # from EventMonitor import EventMonitor

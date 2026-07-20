@@ -16,12 +16,12 @@ class Action:
 
 @dataclass
 class MoveIntent(Intent):
-    target_pos: list[int]
+    target_pos: tuple[int]
 
 @dataclass
 class ThrowIntent(Intent):
     disc_id: int
-    motion: list[int]
+    motion: tuple[int]
 
 @dataclass
 class CatchIntent(Intent):
@@ -43,12 +43,16 @@ class AgentBase(ABC):
 class ActionSystem:
     def __init__(self):
         pass
-    
 
+    def _distance2d(self, pos1: list[float], pos2: list[float]):
+        return ((pos1[0] - pos2[0]) ** 2 + (pos1[1] - pos2[1]) ** 2) ** 0.5
         
 
     def _envelope(self, player_key: PlayerKey, intent: Intent) -> Action:
         return Action(player_key, intent)
+    
+    def _within_catch_speed(self, velocity: tuple[float, float, float], limit: tuple[float, float, float]) -> bool:
+        return all(abs(v) <= l for v, l in zip(velocity, limit))
 
     def setup(self, register_dict: dict, gamestate: GameState) -> bool:
         '''设置注册表, 此处返回 bool 用以表示注册表是否成功设置'''
@@ -59,7 +63,8 @@ class ActionSystem:
             for player_key, agent in register_dict.items():
                 agent.init(player_key)
         except Exception as e:
-            print(f'ERROR:{e}')
+            # print(f'ERROR:{e}')
+            pass
 
         return True
     
@@ -78,21 +83,116 @@ class ActionSystem:
                             self.action_list.pop()
 
             except Exception as e:
-                print(f'ERROR:{e}')
+                # print(f'ERROR:{e}')
+                pass
             
         return True
     
     def _anti_cheat(self, state:GameStateSnap, action: Action) -> bool:
-        return True #现在没有任何反作弊措施，以后再写（
+        #0 验证Intent合法性
+        if isinstance(action.intent, (ThrowIntent, CatchIntent, MoveIntent)):
+            pass
+        else:
+            print(f'未知动作{type(action.intent)}')
+            return False
+
+        
+        #1 MoveIntent检测
+        if isinstance(action.intent, MoveIntent):
+            #1.0 确认 player
+            player = state.team_list[action.player_key.team_id].player_list[action.player_key.player_id]
+            disc = state.disc
+
+            #1.1 确认目标合法
+            if type(action.intent.target_pos) == tuple and len(action.intent.target_pos) == 2:
+                pass
+            else:
+                return False
+            
+            #1.2 确认未持盘
+            if player.hold_disc == False and disc.holder_key != action.player_key:
+                pass
+            else:
+                return False
+            
+            #1.3 确认移速
+            if self._distance2d(list(player.pos), list(action.intent.target_pos)) <= state.const.PLAYER_SPEED * state.delta_time:
+                pass
+            else:
+                return False
+            
+        #2 ThrowIntent检测
+        elif isinstance(action.intent, ThrowIntent):
+            #2.0 确认player
+            player = state.team_list[action.player_key.team_id].player_list[action.player_key.player_id]
+            disc = state.disc
+
+            #2.1 确认目标合法
+            if type(action.intent.motion) == tuple and len(action.intent.motion) == 3:
+                pass
+            else: 
+                return False
+            
+            #2.2 确认持盘人
+            if disc.holder_key == action.player_key and player.hold_disc == True:
+                pass
+            else:
+                return False
+            
+            #2.3 确认飞盘状态
+            if disc.state == 'catched':
+                pass
+            else:
+                return False
+
+        #3 CatchIntent检测
+        elif isinstance(action.intent, CatchIntent):
+            #3.0 确认player
+            player = state.team_list[action.player_key.team_id].player_list[action.player_key.player_id]
+            disc = state.disc
+
+            #3.1 确认飞盘状态
+            if disc.state == 'flying' or disc.state == 'competing' or disc.state == 'waiting':
+                pass
+            else:
+                return False
+            
+            #3.2 确认玩家状态
+            if player.hold_disc == False and disc.holder_key == None:
+                pass
+            else:
+                return False
+            
+            #3.3 确认接盘（不是这个词好喜感啊（））状态
+            if self._distance2d(list(player.pos), (disc.pos[0], disc.pos[1])) <= state.const.CATCH_DISTANCE and disc.pos[2] <= state.const.CATCH_HIGHT:                
+                if self._within_catch_speed(disc.velocity, state.const.CATCH_SPEED):
+                    pass
+                else:
+                    return False
+            else:
+                return False
+
+            #3.4 确保不在sub中以防止刷爆率
+            if action.player_key not in self.gamestate.disc.sub_holder:
+                pass
+            else:
+                return False
+            
+        #恭喜你经过不知道多少劫，活到了最后，堪称耐活王，成功证明自己没有作弊
+        #你过关！
+        return True
+
+
         
     def apply(self):
         for action in self.action_list:
             if isinstance(action.intent, MoveIntent):
-                self.gamestate.team_list[action.player_key.team_id].player_list[action.player_key.player_id].pos = action.intent.target_pos
+                self.gamestate.team_list[action.player_key.team_id].player_list[action.player_key.player_id].pos = list(action.intent.target_pos)
             
             elif isinstance(action.intent, ThrowIntent):
                 self.gamestate.disc.holder_key = None
                 self.gamestate.disc.velocity = action.intent.motion
+                self.gamestate.disc.pos[2] += 2
                 self.gamestate.disc.state = "flying"
                 self.gamestate.team_list[action.player_key.team_id].player_list[action.player_key.player_id].hold_disc = False
 

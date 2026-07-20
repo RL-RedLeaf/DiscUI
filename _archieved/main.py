@@ -1,5 +1,5 @@
-import DiscUI
-from DiscUI import ControlledPlayerAgent,NoTeamAgent
+import _archieved.DiscUI as DiscUI
+from _archieved.DiscUI import ControlledPlayerAgent,NoTeamAgent
 
 
 

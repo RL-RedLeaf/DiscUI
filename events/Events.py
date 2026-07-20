@@ -43,3 +43,8 @@ class DiscCatchEvent(Event):
 @dataclass(frozen = True)
 class ScoreEvent(Event):
     score_team_id: int
+
+@dataclass(frozen = True)
+class ResetEvent(Event):
+    pull_team_id: int
+    gamestate: GameStateSnap

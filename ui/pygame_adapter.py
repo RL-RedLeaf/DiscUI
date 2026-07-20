@@ -19,6 +19,7 @@ class PygameRenderPort(RenderPort):
         self.event_bus = event_bus
         self.event_bus.subscribe(GameStartEvent, self.on_game_start)
         self.event_bus.subscribe(GamePlayEvent, self.on_game_play)
+        self.event_bus.subscribe(ResetEvent, self.on_game_reset)
         if self.screen:
             return  # 防呆操作
         
@@ -34,6 +35,9 @@ class PygameRenderPort(RenderPort):
 
     def on_game_play(self, event: GamePlayEvent):
         self.draw(event.game_state)
+
+    def on_game_reset(self, event: ResetEvent):
+        self.draw(event.gamestate)
 
     def draw(self, state: GameStateSnap):
         import pygame

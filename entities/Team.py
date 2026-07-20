@@ -19,7 +19,7 @@ class PlayerSnap:
 class TeamSnap:
     team_id: int
     player_num: int
-    player_list: tuple
+    player_list: tuple[PlayerSnap]
 
 
 class Player(Entity):                   #队员类，不与游戏主进程进行直接交互，将信息传达至自己的team类
@@ -56,4 +56,5 @@ class Team:                             #队伍类，与队员和游戏主进程
 
     def create_snap(self) -> TeamSnap:
         return TeamSnap(self.team_id, self.player_num, tuple([player.create_snap() for player in self.player_list]))
+
 

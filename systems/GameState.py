@@ -22,7 +22,7 @@ class GameState:
 @dataclass(frozen = True)
 class GameStateSnap:
     disc: DiscSnap
-    team_list: tuple
+    team_list: tuple[TeamSnap]
     delta_time: float
     const: Constants
     score: tuple

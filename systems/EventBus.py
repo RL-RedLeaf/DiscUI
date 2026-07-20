@@ -5,11 +5,8 @@ class EventBus:
 
     def subscribe(self,event_type, callback):
         """订阅事件:当event_type事件发生时,调用callback函数"""
-        for event, callbacks in self.subscribers.items():
-            if isinstance(event, event_type):
-                self.subscribers[event_type].append(callback)
-                return 
-        self.subscribers[event_type] = []
+        if event_type not in self.subscribers:
+            self.subscribers[event_type] = []
         self.subscribers[event_type].append(callback)
         return
 
