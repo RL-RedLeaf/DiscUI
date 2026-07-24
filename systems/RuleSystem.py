@@ -92,7 +92,7 @@ class RuleSystem:
             return self.states['RESET']
         #检测盘出界
         if self.gamestate.disc.pos[0] < 0 or self.gamestate.disc.pos[1] < 0 or self.gamestate.disc.pos[0] > self.gamestate.const.GAME_SIZE[0] or self.gamestate.disc.pos[1] > self.gamestate.const.GAME_SIZE[1]:
-            self.event_bus.publish(FoulEvent('stall', self.last_holder_key.team_id, self.last_holder_key))
+            self.event_bus.publish(FoulEvent('out', self.last_holder_key.team_id, self.last_holder_key))
             self.hold_time = 0.0
             return self.states['RESET']
         

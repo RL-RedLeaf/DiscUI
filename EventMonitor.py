@@ -6,4 +6,6 @@ class EventMonitor:
         self.event_bus.subscribe(Event, self.on_event)
 
     def on_event(self, event):
+        if isinstance(event, GamePlayEvent):
+            return 0
         print(f"EventMonitor: Received event: {event}")
