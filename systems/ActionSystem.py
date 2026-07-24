@@ -1,5 +1,5 @@
 from __future__  import annotations
-from concurrent.futures import ThreadPoolExecutor, TimeoutError
+from concurrent.futures import ThreadPoolExecutor, TimeoutError,wait
 from dataclasses import dataclass
 from entities import PlayerKey
 from abc import ABC, abstractmethod
@@ -60,6 +60,7 @@ class ActionSystem:
         '''设置注册表, 此处返回 bool 用以表示注册表是否成功设置'''
         self.register_dict = register_dict
         self.gamestate = gamestate
+        self.running_futures = {}
 
         try:
             for player_key, agent in register_dict.items():
@@ -73,25 +74,49 @@ class ActionSystem:
     def agent_loop(self, state: GameStateSnap):
         '''每一帧获取 agent 的决策'''
         self.action_list: list[Action] = []
+
+        for player_key, future in list(self.running_futures.items()):
+            if future.done():
+                # 旧结果过期，不使用，只清掉
+                del self.running_futures[player_key]
+
+
+        future_to_player = {}
         for player_key, agent in self.register_dict.items():
+            if player_key in self.running_futures:
+                # 上一次还没跑完，本帧不再提交
+                print(f"Agent {player_key} still running, skip")
+                continue
+
             future = self.executor.submit(agent.agent, state)
+            future_to_player[future] = player_key
+            self.running_futures[player_key] = future
+
+        done, not_done = wait(
+        future_to_player.keys(),
+        timeout=self.agent_time_limit)
+
+        for future in done:
+            player_key = future_to_player[future]
+
+            if self.running_futures.get(player_key) is future:
+                del self.running_futures[player_key]
+
+
             try:
-                intents = future.result(timeout=self.agent_time_limit)
-            except TimeoutError:
-                print(f"Agent {player_key} timeout")
-                intents = []
-            try:
-                if intents:
-                    for intent in intents:
-                        self.action_list.append(self._envelope(player_key, intent))   #打包封装为 Action
-                        if self._anti_cheat(state, self.action_list[-1]):             #开始神人操作之，神人反作弊
-                            pass
-                        else:
-                            self.action_list.pop()
+                intents = future.result()
             except Exception as e:
-                # print(f'ERROR:{e}')
-                pass
-            
+                print(f"Agent {player_key} error: {e}")
+                continue
+
+            if not intents:
+                continue
+
+            for intent in intents:
+                action = self._envelope(player_key, intent)
+                if self._anti_cheat(state, action):
+                    self.action_list.append(action)
+
         return True
     
     def _anti_cheat(self, state:GameStateSnap, action: Action) -> bool:
@@ -197,7 +222,7 @@ class ActionSystem:
             
             elif isinstance(action.intent, ThrowIntent):
                 self.gamestate.disc.holder_key = None
-                self.gamestate.disc.velocity = action.intent.motion
+                self.gamestate.disc.velocity = list(action.intent.motion)
                 self.gamestate.disc.pos[2] += 2
                 self.gamestate.disc.state = "flying"
                 self.gamestate.team_list[action.player_key.team_id].player_list[action.player_key.player_id].hold_disc = False

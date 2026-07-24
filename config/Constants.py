@@ -15,10 +15,10 @@ class Constants:
 
     GRAVITY: float = -9.8
 
-    PLAYER_SPEED: int = 180
+    PLAYER_SPEED: int = 100
     CATCH_DISTANCE: int = 20
     CATCH_HIGHT: int = 2
-    CATCH_SPEED: tuple[int] =(10, 10, 3)        #这个是用来校验的，毕竟飞盘太快会脱手嘛，合理awa
+    CATCH_SPEED: tuple[int] =(1000, 1000, 3)        #这个是用来校验的，毕竟飞盘太快会脱手嘛，合理awa
 
     MAX_HOLD_TIME: int = 2
 
