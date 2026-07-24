@@ -20,5 +20,7 @@ class Constants:
     CATCH_HIGHT: int = 2
     CATCH_SPEED: tuple[int] =(10, 10, 3)        #这个是用来校验的，毕竟飞盘太快会脱手嘛，合理awa
 
+    MAX_HOLD_TIME: int = 2
+
     BLUE_SCORE_AREA: tuple[float, float, float, float] = (GAME_SIZE[0] - SCORE_LENTH, 0, SCORE_LENTH, GAME_SIZE[1])
     RED_SCORE_AREA: tuple[float, float, float, float] = (0, 0, SCORE_LENTH, GAME_SIZE[1])
