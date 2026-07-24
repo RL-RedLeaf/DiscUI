@@ -5,6 +5,7 @@ from events import *
 from systems import *
 from ui import *
 from random import choice as randchoice
+import time
 
 class State(Enum):
     PREPARE = auto()
@@ -28,6 +29,13 @@ class GameCoordinator():
         self._init_states()
         self.event_bus.subscribe(FoulEvent, self.on_foul_event)
         self.event_bus.subscribe(ScoreEvent, self.on_score_event)
+        #时间管理类
+        self.target_frame_time = 1 / fps
+        self.frame_start = 0.0
+        self.frame_elapsed = 0.0
+        self.sleep_time = 0.0
+        self.frame_overrun = 0.0
+        self.sum_elapsed = 0.0
 
     def _init_states(self):
         self.states = State
@@ -172,6 +180,8 @@ class GameCoordinator():
 
     def mainloop(self):
         while self.current_state != self.states["HALT"]:
+            self.frame_start = time.perf_counter()
+
             if self.current_state == self.states["PREPARE"]:
                 self._prepare()
             elif self.current_state == self.states["START"]:
@@ -193,6 +203,30 @@ class GameCoordinator():
                     
                 else:
                     print(f'状态转换失败, from {self.current_state} to {self.pending_state}')
+
+
+            self.frame_elapsed = time.perf_counter() - self.frame_start
+            self.sum_elapsed += self.frame_elapsed
+            self.sleep_time = self.target_frame_time - self.frame_elapsed
+            if self.sleep_time > 0:
+                time.sleep(self.sleep_time)
+                self.frame_overrun = 0.0
+            else:
+                self.frame_overrun = -self.sleep_time
+
+            try:
+                if self.gamestate.tick % self.fps == 0:
+                    print(
+                        f"===60-ticks-sum==="
+                        f"work={self.frame_elapsed * 1000:.2f}ms, "
+                        f"avg_work={self.sum_elapsed / self.fps * 1000:.2f}ms, "
+                        f"sleep={max(self.sleep_time, 0) * 1000:.2f}ms, "
+                        f"overrun={self.frame_overrun * 1000:.2f}ms"
+                    )
+                    self.sum_elapsed = 0.0
+            except Exception as e:
+                pass
+
 
         print("游戏结束, 进入 HALT 状态")
 

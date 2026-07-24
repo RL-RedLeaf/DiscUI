@@ -1,4 +1,5 @@
 from __future__  import annotations
+from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from dataclasses import dataclass
 from entities import PlayerKey
 from abc import ABC, abstractmethod
@@ -42,7 +43,8 @@ class AgentBase(ABC):
 
 class ActionSystem:
     def __init__(self):
-        pass
+        self.executor = ThreadPoolExecutor(max_workers=8)
+        self.agent_time_limit = 0.01
 
     def _distance2d(self, pos1: list[float], pos2: list[float]):
         return ((pos1[0] - pos2[0]) ** 2 + (pos1[1] - pos2[1]) ** 2) ** 0.5
@@ -71,17 +73,21 @@ class ActionSystem:
     def agent_loop(self, state: GameStateSnap):
         '''每一帧获取 agent 的决策'''
         self.action_list: list[Action] = []
-        for player_ley, agent in self.register_dict.items():
+        for player_key, agent in self.register_dict.items():
+            future = self.executor.submit(agent.agent, state)
             try:
-                intents = agent.agent(state)        #获取决策列表
+                intents = future.result(timeout=self.agent_time_limit)
+            except TimeoutError:
+                print(f"Agent {player_key} timeout")
+                intents = []
+            try:
                 if intents:
                     for intent in intents:
-                        self.action_list.append(self._envelope(player_ley, intent))   #打包封装为 Action
+                        self.action_list.append(self._envelope(player_key, intent))   #打包封装为 Action
                         if self._anti_cheat(state, self.action_list[-1]):             #开始神人操作之，神人反作弊
                             pass
                         else:
                             self.action_list.pop()
-
             except Exception as e:
                 # print(f'ERROR:{e}')
                 pass

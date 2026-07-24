@@ -13,6 +13,7 @@ class PygameRenderPort(RenderPort):
         self.height = height
         self.screen = None
         self.px_portion = 1.0  # 每个单位长度对应的像素比例, 用于缩放
+        
     
     def init(self, game_size: tuple[int], event_bus: EventBus):
         self.px_portion = min(self.width / game_size[0], self.height / game_size[1])
