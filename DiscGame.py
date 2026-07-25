@@ -240,9 +240,10 @@ class GameCoordinator():
 from ui import PygameRenderPort
 from PlayerAgents import *
 
-
+#[FourPlayerHandlerAgent(), FourPlayerLeftCutterAgent(), FourPlayerRightCutterAgent(), FourPlayerDeepReceiverAgent()]
+#[emptyPlayerAgent(), emptyPlayerAgent(), emptyPlayerAgent(), emptyPlayerAgent()]
 if __name__ == "__main__":
-    game = GameCoordinator(2, player_agent_list=[[emptyPlayerAgent(), emptyPlayerAgent()], [emptyPlayerAgent(), emptyPlayerAgent()]], fps=60)
+    game = GameCoordinator(4, player_agent_list=[[FourPlayerHandlerAgent(), FourPlayerLeftCutterAgent(), FourPlayerRightCutterAgent(), FourPlayerDeepReceiverAgent()], [FourPlayerHandlerAgent(), FourPlayerLeftCutterAgent(), FourPlayerRightCutterAgent(), FourPlayerDeepReceiverAgent()]], fps=60)
     game.set_render(PygameRenderPort(1230, 1200))
 
     from EventMonitor import EventMonitor
