@@ -15,12 +15,13 @@ class Constants:
 
     GRAVITY: float = -9.8
 
-    PLAYER_SPEED: int = 100
-    CATCH_DISTANCE: int = 20
-    CATCH_HIGHT: int = 2
-    CATCH_SPEED: tuple[int] =(1000, 1000, 3)        #这个是用来校验的，毕竟飞盘太快会脱手嘛，合理awa
+    PLAYER_SPEED: float = 120
+    CATCH_DISTANCE: float = 20
+    CATCH_HIGHT: float = 2
 
-    MAX_HOLD_TIME: int = 2
+    MIN_THROW_SPEED: tuple[float, float, float] = (0, 0, 1)
+
+    MAX_HOLD_TIME: float = 2
 
     BLUE_SCORE_AREA: tuple[float, float, float, float] = (GAME_SIZE[0] - SCORE_LENTH, 0, SCORE_LENTH, GAME_SIZE[1])
     RED_SCORE_AREA: tuple[float, float, float, float] = (0, 0, SCORE_LENTH, GAME_SIZE[1])

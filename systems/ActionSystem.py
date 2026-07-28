@@ -53,8 +53,8 @@ class ActionSystem:
     def _envelope(self, player_key: PlayerKey, intent: Intent) -> Action:
         return Action(player_key, intent)
     
-    def _within_catch_speed(self, velocity: tuple[float, float, float], limit: tuple[float, float, float]) -> bool:
-        return all(abs(v) <= l for v, l in zip(velocity, limit))
+    def _bigger_speed(self, velocity: tuple[float, float, float], limit: tuple[float, float, float]) -> bool:
+        return all(abs(v) >= l for v, l in zip(velocity, limit))
 
     def setup(self, register_dict: dict, gamestate: GameState) -> bool:
         '''设置注册表, 此处返回 bool 用以表示注册表是否成功设置'''
@@ -160,7 +160,10 @@ class ActionSystem:
 
             #2.1 确认目标合法
             if type(action.intent.motion) == tuple and len(action.intent.motion) == 3:
-                pass
+                if self._bigger_speed(action.intent.motion, state.const.MIN_THROW_SPEED):
+                    pass
+                else:
+                    return False
             else: 
                 return False
             
@@ -175,6 +178,7 @@ class ActionSystem:
                 pass
             else:
                 return False
+            
 
         #3 CatchIntent检测
         elif isinstance(action.intent, CatchIntent):
@@ -196,10 +200,7 @@ class ActionSystem:
             
             #3.3 确认接盘（不是这个词好喜感啊（））状态
             if self._distance2d(list(player.pos), (disc.pos[0], disc.pos[1])) <= state.const.CATCH_DISTANCE and disc.pos[2] <= state.const.CATCH_HIGHT:                
-                if self._within_catch_speed(disc.velocity, state.const.CATCH_SPEED):
-                    pass
-                else:
-                    return False
+                pass
             else:
                 return False
 
@@ -230,7 +231,7 @@ class ActionSystem:
             elif isinstance(action.intent, CatchIntent):
                 self.gamestate.disc.sub_holder.append(action.player_key)
                 if self.gamestate.disc.competing_ticks <= 0:
-                    self.gamestate.disc.competing_ticks = 5
+                    self.gamestate.disc.competing_ticks = 3
                 self.gamestate.disc.state = 'competing'
 
             

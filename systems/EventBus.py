@@ -19,4 +19,7 @@ class EventBus:
         for event_type, callbacks in self.subscribers.items():
             if isinstance(event, event_type):
                 for callback in callbacks:
-                    callback(event)
+                    try:
+                        callback(event)
+                    except Exception as e:
+                        print(f'ERROR: {e}')

@@ -229,6 +229,7 @@ class GameCoordinator():
 
 
         print("游戏结束, 进入 HALT 状态")
+        exit(114514)
 
 
     def on_foul_event(self, event: FoulEvent):
@@ -240,7 +241,7 @@ class GameCoordinator():
 from ui import PygameRenderPort
 from PlayerAgents import *
 
-#[FourPlayerHandlerAgent(), FourPlayerLeftCutterAgent(), FourPlayerRightCutterAgent(), FourPlayerDeepReceiverAgent()]
+
 #[emptyPlayerAgent(), emptyPlayerAgent(), emptyPlayerAgent(), emptyPlayerAgent()]
 if __name__ == "__main__":
     game = GameCoordinator(4, player_agent_list=[[emptyPlayerAgent(), emptyPlayerAgent(), emptyPlayerAgent(), emptyPlayerAgent()],[emptyPlayerAgent(), emptyPlayerAgent(), emptyPlayerAgent(), emptyPlayerAgent()]], fps=60)
@@ -251,4 +252,4 @@ if __name__ == "__main__":
     try:
         game.mainloop()
     except KeyboardInterrupt:
-        print('游戏已被外部中断(说, 是不是你自己手贱按了ctrl+C)')
+        print('游戏已被外部中断(说, 是不是你自己手贱按了ctrl+C!)')
