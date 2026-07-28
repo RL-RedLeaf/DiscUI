@@ -2,218 +2,256 @@
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Renderer: pygame](https://img.shields.io/badge/renderer-pygame-green.svg)](https://www.pygame.org/)
+[![Platform](https://img.shields.io/badge/platform-windows%20|%20linux%20|%20macos-lightgrey)](https://pypi.org/project/pygame/)
 
-DiscUI 是一个面向智能体的飞盘游戏实验框架。项目将比赛状态、物理更新、规则判定、动作校验和渲染输出拆分为相对独立的系统，并通过只读快照向 agent 提供游戏信息，便于开发和验证不同的策略逻辑。
+DiscUI 是一个 **~~“轻量级”~~** 的飞盘游戏框架，专为为智能体设计（当然你要手操也没问题awa）。支持用户自定义编写智能体（agent），并可以开发和测试不同的策略或行为逻辑。
+DiscUI 还支持使用不同渲染器来查看游戏对局（支持自定义），也自带 pygame 渲染器
 
-该框架适用于编写玩家 agent、测试基础飞盘策略、观察规则系统与物理系统的交互，并为后续扩展渲染、记录、调试或外部控制接口提供基础结构。
+## 目录
+
+- [快速开始](#快速开始)
+- [架构说明](#架构说明)
+- [API参考](#API参考)
+- [代码规范](#代码规范)
+- [许可证](#许可证)
 
 ## 快速开始
 
 ### 环境要求
 
 - Python 3.10+
-- pygame
+- pygame (如果你想使用自带渲染器的话)
+
+### 安装依赖
 
 ```bash
 pip install pygame
 ```
 
-### 运行内置示例
+### 基本使用
 
-当前入口在 `DiscGame.py`。直接运行该文件会创建两队各 2 名空 agent，并使用 pygame 渲染比赛场地。
+飞盘框架主体逻辑位于 `DiscGame.py` , 主入口位于 `game()` ，`main.py` 提供了一个使用示例。而 `PlayerAgent.py` 存放了一些基础的Agent（其实`DiscUI.py`中也内置了两个Agent）。
 
-```bash
-python DiscGame.py
-```
-
-### 最小启动代码
-
+* 主入口`game()` 
 ```python
-from DiscGame import GameCoordinator
-from PlayerAgents import emptyPlayerAgent
-from ui import PygameRenderPort
+def game(player_num: int, team_agent_list: list, player_agent_list: list) -> None:
+    pygame.init()                              #初始化pygame
+    screen = pygame.display.set_mode((980,640))
+    ...
+```
+**参数:**
+- `player_num` (int): 每队玩家数量
+- `team_agent_list` (list): 队伍agent列表 `[team1_agent, team2_agent]`
+- `player_agent_list` (list): 玩家agent嵌套列表 `[[team1_players], [team2_players]]`
 
-player_num = 2
-player_agents = [
-    [emptyPlayerAgent() for _ in range(player_num)],
-    [emptyPlayerAgent() for _ in range(player_num)],
-]
+* 调用示例
+```python
+import DiscUI                                   #导入模块
+from DiscUI import ControlledPlayerAgent, NoTeamAgent
+                                                #内置两个简易Agent(键盘操控玩家 & 无团队策略)
+from PlayerAgents import SimplePlayerAgent, SimpleTeamAgent
+                                                #PlayerAgents模块提供两个简单的策略Agent
+player_num = 2                                  #设定玩家数量
 
-game = GameCoordinator(player_num, player_agents, fps=60)
-game.set_render(PygameRenderPort(1230, 1200))
-game.mainloop()
+player_agent_list = [[SimplePlayerAgent() for i in range(player_num)],
+                     [ControlledPlayerAgent() for i in range(player_num)]]
+
+team_agent_list = [NoTeamAgent(),NoTeamAgent()]
+                                                #创建Agent实例
+DiscUI.game(player_num = player_num,
+            team_agent_list = team_agent_list,
+            player_agent_list = player_agent_list)
+                                                #调用主入口函数，传入对应参数
 ```
 
-如果需要接入自定义监控、记录或外部控制逻辑，可以在 `GameCoordinator` 创建后通过 `game.event_bus` 订阅事件。
+### 默认控制键位
 
-## 当前架构
+使用 `ControlledPlayerAgent` 时的默认控制：
 
-项目现在围绕 `GameCoordinator` 驱动的状态机运行：
+| 按键 | 功能 |
+|------|------|
+| W/A/S/D | 移动玩家 |
+| 空格键 | 尝试接住飞盘 |
+| Q键 | 投掷飞盘（需持有飞盘） |
 
-```text
-PREPARE -> START -> PLAY -> RESET -> PLAY
-                         \-> HALT
+## 架构说明
+
+- 本框架架构由我和Deepseek的交流而形成，加以不全面不到位的实施，因此架构显得十分繁琐，堪称 **史山**
+- 本架构尝试使用 **事件总线** 以实现各个组件之间的解耦。幸运的是，我们并没有成功（
+
+### 核心组件
+
 ```
-
-主要目录：
-
-```text
 DiscUI/
-├── DiscGame.py          # 游戏协调器、状态机、主循环
-├── PlayerAgents.py      # 示例 agent
-├── config/              # 游戏常量
-├── entities/            # Disc、Team、Player 及只读快照
-├── events/              # 事件类型
-├── systems/             # 动作、物理、规则、事件总线、游戏状态
-├── ui/                  # 渲染端口与 pygame 适配器
-└── Docs/                # 规则、重构设计和调试记录
+├── DiscGame        # 游戏主控制器
+├── EventBus        # 事件总线系统
+├── Team            # 队伍管理器
+├── Player          # 玩家实体
+├── Disc            # 飞盘物理引擎
+├── UI              # 可视化界面
+└── Agent基类       # 策略接口
 ```
 
-每一帧的核心流程如下：
+### 事件驱动架构
 
-1. `GameCoordinator` 创建 `GameStateSnap`。
-2. `EventBus` 发布 `GamePlayEvent`，渲染器等订阅者读取快照。
-3. `ActionSystem` 并发调用所有 agent，收集 `Intent`。
-4. `ActionSystem` 对动作做合法性校验，然后写回 `GameState`。
-5. `PhysicSystem` 更新飞盘位置和速度。
-6. `RuleSystem` 判定得分、犯规、超时、争抢、落地和出界。
-7. 如需重置，状态机进入 `RESET` 并发布 `ResetEvent`。
-
-## 编写 Agent
-
-Agent 需要继承 `systems.AgentBase`，实现两个方法：
-
-- `init(player_key)`：绑定当前 agent 对应的 `PlayerKey`。
-- `agent(gamestate)`：读取 `GameStateSnap`，返回一个 `Intent` 列表。
+系统采用发布-订阅模式进行组件通信:
 
 ```python
-from systems import AgentBase, CatchIntent, MoveIntent, ThrowIntent
+# 订阅事件
+event_bus.subscribe(EventType, callback_function)
+
+# 发布事件
+event_bus.publish(event_object)
+```
+
+事件总线调用方式:
+
+```python
+    def publish(self, event):
+        """发布事件：将事件分发给所有订阅者"""
+        event_type = type(event)
+        if event_type in self.subscribers:
+            for callback in self.subscribers[event_type]:
+                callback(event)
+```
 
 
-class MyPlayerAgent(AgentBase):
-    def init(self, player_key):
-        self.player_key = player_key
+### 主要事件类型
 
+| 事件类型 | 用途 | 触发条件 |
+|---------|------|----------|
+| `GameStartEvent` | 游戏初始化 | 游戏开始时 |
+| `GameState` | 游戏总状态 | 每一游戏刻（驱动游戏整体运行） |
+| `DiscStateEvent` | 飞盘状态更新 | 飞盘位置或状态改变 |
+| `TeamStateEvent` | 队伍状态更新 | 队伍信息变更 |
+| `DiscThrownEvent` | 飞盘投掷 | 队员尝试投掷飞盘 |
+| `DiscCaughtEvent` | 飞盘接住 | 队员尝试接住飞盘 |
+
+
+## API参考
+
+### 主函数
+
+#### `game(player_num, team_agent_list, player_agent_list)`
+
+启动飞盘游戏
+
+**参数:**
+- `player_num` (int): 每队玩家数量
+- `team_agent_list` (list): 队伍agent列表 `[team1_agent, team2_agent]`
+- `player_agent_list` (list): 玩家agent嵌套列表 `[[team1_players], [team2_players]]`
+
+### Agent基类
+
+#### PlayerAgentBase
+
+```python
+class MyPlayerAgent(PlayerAgentBase):
+    def agent_func(self):
+        # 访问游戏信息
+        info = self.information
+        # 返回动作指令
+        return {'move': [x, y], 'catch': True}
+```
+
+#### TeamAgentBase
+
+```python
+class MyTeamAgent(TeamAgentBase):
+    def get_mode(self):
+        return 0  # 0=进攻, 1=防守
+    
     def agent(self, gamestate):
-        player = gamestate.team_list[self.player_key.team_id].player_list[self.player_key.player_id]
-        disc = gamestate.disc
-
-        if disc.state in ("flying", "waiting"):
-            return [CatchIntent(disc_id=0)]
-
-        target_x = player.pos[0] + 1
-        target_y = player.pos[1]
-        return [MoveIntent((target_x, target_y))]
-```
-
-目前支持三类意图：
-
-| Intent | 用途 | 关键字段 |
-| --- | --- | --- |
-| `MoveIntent` | 移动未持盘玩家 | `target_pos: tuple[int, int]` |
-| `ThrowIntent` | 持盘者投掷飞盘 | `motion: tuple[int, int, int]` |
-| `CatchIntent` | 尝试接住飞盘 | `disc_id: int` |
-
-`ActionSystem` 会把 agent 返回的 Intent 包装成 Action，并校验：动作类型、移动速度、持盘状态、接盘距离/高度/速度、重复抢盘等。校验失败的动作会被丢弃。
-
-## 游戏状态快照
-
-系统内部维护可变的 `GameState`，agent 和渲染器读取冻结快照 `GameStateSnap`。
-
-```python
-@dataclass(frozen=True)
-class GameStateSnap:
-    disc: DiscSnap
-    team_list: tuple[TeamSnap]
-    delta_time: float
-    const: Constants
-    score: tuple
-    tick: int
-```
-
-该设计约定如下：
-
-- 系统层可以修改 `GameState`。
-- agent 只能根据 `GameStateSnap` 做决策。
-- renderer 也只读取 `GameStateSnap`。
-- 玩家身份统一使用 `PlayerKey(team_id, player_id)`。
-
-飞盘状态当前使用字符串：
-
-| 状态 | 含义 |
-| --- | --- |
-| `waiting` | 开盘点等待接盘 |
-| `flying` | 飞盘在空中运动 |
-| `competing` | 多名玩家正在争抢 |
-| `catched` | 已被玩家持有 |
-| `ground` | 落地，随后触发规则重置 |
-
-## 事件系统
-
-`EventBus` 提供最小的发布订阅机制：
-
-```python
-game.event_bus.subscribe(GamePlayEvent, callback)
-game.event_bus.publish(event)
-```
-
-当前主要事件：
-
-| 事件 | 触发时机 |
-| --- | --- |
-| `GameStartEvent` | START 阶段完成场地初始化后 |
-| `GamePlayEvent` | PLAY 阶段每一帧 |
-| `FoulEvent` | 触碰、超时、出界、落地等规则事件 |
-| `DiscCatchEvent` | 争抢结束并确定持盘者 |
-| `ScoreEvent` | 有队伍得分 |
-| `ResetEvent` | 得分或犯规后重置发盘 |
-
-pygame 渲染器通过订阅这些事件完成画面更新。
-
-## 渲染端口
-
-渲染层通过 `ui.RenderPort` 抽象出来：
-
-```python
-class RenderPort(ABC):
-    def init(self, game_size, event_bus):
-        pass
-
-    def draw(self, state):
+        # 队伍级别决策
         pass
 ```
 
-默认实现是 `PygameRenderPort`。如果需要接入其他前端、记录回放，或执行无窗口测试，可以实现自定义 `RenderPort`，再传给：
+### 游戏信息结构
 
+队员agent可访问的游戏状态信息:
 ```python
-game.set_render(MyRenderPort())
+        self.information ={
+            'my_position': self.player.pos.copy(),      #队员所处位置
+            'my_team_id': self.player.team_id,          #队员队伍ID
+            'my_id': self.player.id,                    #队员ID
+            'my_memory':self.memory,                    #队员记忆（预留项）
+            'hold_disc': False if self.player.hold_disc is None else True,  #是否持有飞盘
+            'disc': {                                   
+                'position': gamestate.disc.pos,         #飞盘位置
+                'state': gamestate.disc.state,          #飞盘状态(0=落地,1=空中,2=持有,3=争夺)
+                'holder': gamestate.disc.holder,        #飞盘持有者
+                'height': gamestate.disc.height,        #飞盘高度
+            },
+            'teammates': [  
+                {'position': p.pos, 'id': p.id}         #队友位置和 ID
+                for p in gamestate.teams[self.player.team_id].player_list
+                if p.id != self.player.id
+            ],
+            'opponents': [
+                {'position': p.pos, 'id': p.id}         #对手位置和ID
+                for p in gamestate.teams[self.oppose_team.team_id].player_list  
+            ],
+            'score_zones': {                            #得分区坐标
+                'my_zone': (0, 0, 60, gamestate.screen.get_height()) if self.player.team_id == 1 
+                          else (gamestate.screen.get_width()-60, 0, 60, gamestate.screen.get_height()),
+                'opponent_zone': (gamestate.screen.get_width()-60, 0, 60, gamestate.screen.get_height()) if self.player.team_id == 1 
+                                else (0, 0, 60, gamestate.screen.get_height())
+            },
+            'score': gamestate.score.copy()             #当前比分
+        }
 ```
 
-## 规则概览
+队伍agent可访问的游戏状态信息:
+```python
+        self.information ={
+            'my_team_id': self.team.team_id,
+            'oppose_team_id': self.oppose_team.team_id,
+            'my_memory':self.memory,
+            'disc': {
+                'position': gamestate.disc.pos,
+                'state': gamestate.disc.state,
+                'holder': gamestate.disc.holder,
+                'height': gamestate.disc.height,
+            },
+            'teammates': [
+                {'position': p.pos, 'id': p.id}
+                for p in gamestate.teams[self.team.team_id].player_list
+            ],
+            'opponents': [
+                {'position': p.pos, 'id': p.id}
+                for p in gamestate.teams[self.oppose_team.team_id].player_list  
+            ],
+            'score_zones': {
+                'my_zone': (0, 0, 60, gamestate.screen.get_height()) if self.team.team_id == 1 
+                          else (gamestate.screen.get_width()-60, 0, 60, gamestate.screen.get_height()),
+                'opponent_zone': (gamestate.screen.get_width()-60, 0, 60, gamestate.screen.get_height()) if self.team.team_id == 1 
+                                else (0, 0, 60, gamestate.screen.get_height())
+            },
+            'score': gamestate.score.copy()
+        }
+```
 
-当前规则系统已经处理：
+## 代码规范
 
-- 得分区内正确持盘得分。
-- 持盘者被对方身体接触后犯规。
-- 持盘时间超过 `Constants.MAX_HOLD_TIME` 后犯规。
-- 多人尝试接盘时进入短暂争抢，并随机确定持盘者。
-- 飞盘落地或出界后重置。
-
-这些规则并非正式极限飞盘规则全集，而是服务于 agent 实验的基础可运行判定集。
-
-## 代码风格
-
-该项目正在从早期单体脚本迁移到模块化结构。当前主要设计约定如下：
-
-- `GameCoordinator` 只负责调度状态和系统。
-- `GameState` 是系统层唯一事实来源。
-- 对外暴露快照，不直接暴露可变实体。
-- agent 返回意图，不直接改游戏对象。
-- 事件用于渲染、监控和外部扩展，不强行承担全部业务解耦。
-
-部分命名、类型标注和文档仍处于迁移过程中，后续可继续统一接口、补充测试并完善开发文档。
+- 不一定遵循PEP 8 Python编码规范
+- 函数和类未必需要适当的文档字符串
+- 可能会保持代码简洁和可读性
+- 可能会添加必要的类型提示
 
 ## 许可证
 
-本项目采用 MIT 许可证，详见 [LICENSE](LICENSE)。
+
+本项目采用 MIT 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情。
+
+ *应给不会有人想要用我的史山代码叭（*
+
+<iframe align="center" src="//player.bilibili.com/player.html?isOutside=true&aid=80433022&bvid=BV1GJ411x7h7&cid=137649199&p=1" scrolling="no" border="0" frameborder="no" framespacing="0" allowfullscreen="true"></iframe>
+
+---
+
+<p align="center">
+  能读到这里你也很厉害了awa 
+  生日快乐（）
+</p>
+
+
