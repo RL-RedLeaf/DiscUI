@@ -22,4 +22,4 @@ class EventBus:
                     try:
                         callback(event)
                     except Exception as e:
-                        print(f'ERROR: {e}')
+                        print(f'ERROR: {e} \n 如果你嫌吵, 请前往systems\\EventBus.py中注释掉这个print语句')
