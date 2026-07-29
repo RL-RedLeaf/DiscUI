@@ -53,8 +53,8 @@ class ActionSystem:
     def _envelope(self, player_key: PlayerKey, intent: Intent) -> Action:
         return Action(player_key, intent)
     
-    def _bigger_speed(self, velocity: tuple[float, float, float], limit: tuple[float, float, float]) -> bool:
-        return all(abs(v) >= l for v, l in zip(velocity, limit))
+    def _bigger_speed(self, velocity: tuple[float, float, float], limit: float) -> bool:
+        return (velocity[0] ** 2 + velocity[1] ** 2) ** 0.5 >=  limit
 
     def setup(self, register_dict: dict, gamestate: GameState) -> bool:
         '''设置注册表, 此处返回 bool 用以表示注册表是否成功设置'''
@@ -138,18 +138,21 @@ class ActionSystem:
             if type(action.intent.target_pos) == tuple and len(action.intent.target_pos) == 2:
                 pass
             else:
+                print(f'反作弊: 数据格式不合法 [{action}]')
                 return False
             
             #1.2 确认未持盘
             if player.hold_disc == False and disc.holder_key != action.player_key:
                 pass
             else:
+                print(f'反作弊: 持盘手禁止移动 [{action}]')
                 return False
             
             #1.3 确认移速
             if self._distance2d(list(player.pos), list(action.intent.target_pos)) <= state.const.PLAYER_SPEED * state.delta_time:
                 pass
             else:
+                print(f'反作弊: 移速过快 [{action}]')
                 return False
             
         #2 ThrowIntent检测
@@ -160,23 +163,27 @@ class ActionSystem:
 
             #2.1 确认目标合法
             if type(action.intent.motion) == tuple and len(action.intent.motion) == 3:
-                if self._bigger_speed(action.intent.motion, state.const.MIN_THROW_SPEED):
+                if self._bigger_speed(action.intent.motion, state.const.MIN_VELOCITY):
                     pass
                 else:
+                    print(f'反作弊: 投掷速度不足 [{action}]')
                     return False
             else: 
+                print(f'反作弊: 数据格式不合法 [{action}]')
                 return False
             
             #2.2 确认持盘人
             if disc.holder_key == action.player_key and player.hold_disc == True:
                 pass
             else:
+                print(f'反作弊: 未持盘 [{action}]')
                 return False
             
             #2.3 确认飞盘状态
             if disc.state == 'catched':
                 pass
             else:
+                print(f'反作弊: 飞盘状态不合法 [{action}]')
                 return False
             
 
@@ -190,24 +197,28 @@ class ActionSystem:
             if disc.state == 'flying' or disc.state == 'competing' or disc.state == 'waiting':
                 pass
             else:
+                print(f'反作弊: 飞盘状态不合法 [{action}]')
                 return False
             
             #3.2 确认玩家状态
             if player.hold_disc == False and disc.holder_key == None:
                 pass
             else:
+                print(f'反作弊: 队员状态不合法 [{action}]')
                 return False
             
             #3.3 确认接盘（不是这个词好喜感啊（））状态
             if self._distance2d(list(player.pos), (disc.pos[0], disc.pos[1])) <= state.const.CATCH_DISTANCE and disc.pos[2] <= state.const.CATCH_HIGHT:                
                 pass
             else:
+                print(f'反作弊: 盘速过快 [{action}]')
                 return False
 
             #3.4 确保不在sub中以防止刷爆率
             if action.player_key not in self.gamestate.disc.sub_holder:
                 pass
             else:
+                print(f'反作弊: 已有接盘动作 [{action}]')
                 return False
             
         #恭喜你经过不知道多少劫，活到了最后，堪称耐活王，成功证明自己没有作弊

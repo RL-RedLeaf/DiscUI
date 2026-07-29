@@ -117,11 +117,11 @@ class GameCoordinator():
                 self.gamestate.disc.sub_holder = []
                 self.gamestate.disc.competing_ticks = 0
                 for team in self.teams:
-                    for player in team.player_list:
-                        player.hold_disc = False
+                    team.reset()
 
                 self.pull_team = self.constants.RED_TEAM_ID
                 self.foul_team_id = None
+
 
             elif self.foul_team_id == self.constants.RED_TEAM_ID:
                 self.gamestate.disc.pos = list(self.constants.BLUE_TEAM_PULL)
@@ -131,8 +131,8 @@ class GameCoordinator():
                 self.gamestate.disc.sub_holder = []
                 self.gamestate.disc.competing_ticks = 0
                 for team in self.teams:
-                    for player in team.player_list:
-                        player.hold_disc = False
+                    team.reset()
+
                 self.pull_team = self.constants.BLUE_TEAM_ID
                 self.foul_team_id = None
             
@@ -145,8 +145,8 @@ class GameCoordinator():
                 self.gamestate.disc.sub_holder = []
                 self.gamestate.disc.competing_ticks = 0
                 for team in self.teams:
-                    for player in team.player_list:
-                        player.hold_disc = False
+                    team.reset()
+
                 self.pull_team = self.constants.RED_TEAM_ID
                 self.score_team_id = None
 
@@ -158,8 +158,8 @@ class GameCoordinator():
                 self.gamestate.disc.sub_holder = []
                 self.gamestate.disc.competing_ticks = 0
                 for team in self.teams:
-                    for player in team.player_list:
-                        player.hold_disc = False
+                    team.reset()
+                    
                 self.pull_team = self.constants.BLUE_TEAM_ID
                 self.score_team_id = None
 

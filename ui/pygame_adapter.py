@@ -1,5 +1,5 @@
 from .port import *
-
+import pygame
 from events import *
 from systems import EventBus
 
@@ -24,24 +24,29 @@ class PygameRenderPort(RenderPort):
         if self.screen:
             return  # 防呆操作
         
-
-        import pygame
         pygame.init()
 
         self.screen = pygame.display.set_mode((int(game_size[0] * self.px_portion), int(game_size[1] * self.px_portion)))
         pygame.display.set_caption("DiscUI")
 
     def on_game_start(self, event: GameStartEvent):
-        self.draw(event.game_state)
-
+        try:
+            self.draw(event.game_state)
+        except Exception as e:
+            pass
     def on_game_play(self, event: GamePlayEvent):
-        self.draw(event.game_state)
+        try:
+            self.draw(event.game_state)
+        except Exception as e:
+            pass
 
     def on_game_reset(self, event: ResetEvent):
-        self.draw(event.gamestate)
+        try:
+            self.draw(event.gamestate)
+        except Exception as e:
+            pass
 
     def draw(self, state: GameStateSnap):
-        import pygame
         # 清屏
         self.screen.fill((0, 255, 0))
         CONST = state.const

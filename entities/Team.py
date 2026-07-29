@@ -54,6 +54,13 @@ class Team:                             #队伍类，与队员和游戏主进程
     def get_register_dict(self) -> dict:
         return self.register_dict
 
+    def reset(self)  -> bool:
+        for i in range(self.player_num):
+            self.player_list[i].pos = (Constants.BLUE_TEAM_PULL[0] if self.team_id == Constants.BLUE_TEAM_ID else Constants.RED_TEAM_PULL[0], 
+                                       (Constants.GAME_SIZE[1] / (self.player_num + 1)) * (i + 1) )
+            self.player_list[i].hold_disc = False
+        return True
+
     def create_snap(self) -> TeamSnap:
         return TeamSnap(self.team_id, self.player_num, tuple([player.create_snap() for player in self.player_list]))
 

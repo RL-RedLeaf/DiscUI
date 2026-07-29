@@ -15,12 +15,11 @@ class Constants:
 
     GRAVITY: float = -9.8
 
-    PLAYER_SPEED: float = 120
+    PLAYER_SPEED: float = 150
     CATCH_DISTANCE: float = 20
     CATCH_HIGHT: float = 2
 
-    MIN_THROW_SPEED: tuple[float, float, float] = (0, 0, 1)
-
+    MIN_VELOCITY: float = 50
     MAX_HOLD_TIME: float = 2
 
     BLUE_SCORE_AREA: tuple[float, float, float, float] = (GAME_SIZE[0] - SCORE_LENTH, 0, SCORE_LENTH, GAME_SIZE[1])

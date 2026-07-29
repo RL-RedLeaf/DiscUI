@@ -26,6 +26,27 @@ class RuleSystem:
 
     def apply(self):
         '''依次判定所有规则事件'''
+        return_state = None #预留变量，看看后续要不要加入规则事件缓存和仲裁机制
+        #v1.1尝试吧抢夺提到最前面，处理飞盘抢夺
+        if self.gamestate.disc.state == 'competing':
+            if self.gamestate.disc.competing_ticks > 0:
+                self.gamestate.disc.competing_ticks -= 1
+            
+            elif self.gamestate.disc.competing_ticks <= 0:
+                self.gamestate.disc.holder_key = choice(self.gamestate.disc.sub_holder)
+                holder = self.gamestate.team_list[self.gamestate.disc.holder_key.team_id].player_list[self.gamestate.disc.holder_key.player_id]
+                holder.hold_disc = True
+                self.hold_time = 0.0
+                self.gamestate.disc.sub_holder = []
+                self.gamestate.disc.pos[0] = self.gamestate.team_list[self.gamestate.disc.holder_key.team_id].player_list[self.gamestate.disc.holder_key.player_id].pos[0]
+                self.gamestate.disc.pos[1] = self.gamestate.team_list[self.gamestate.disc.holder_key.team_id].player_list[self.gamestate.disc.holder_key.player_id].pos[1]
+                self.gamestate.disc.pos[2] = 0
+                self.gamestate.disc.velocity = [0, 0, 0]     
+                self.gamestate.disc.state = 'catched'
+                self.event_bus.publish(DiscCatchEvent(self.gamestate.disc.holder_key))
+                self.gamestate.disc.competing_ticks = 0
+                self.last_holder_key = self.gamestate.disc.holder_key
+
         #这里把得分事件提前了, 以防止冲撞导致得分没有判定成功
         if self.gamestate.disc.state == 'catched':
             if self._inner(self.gamestate.disc.pos, self.gamestate.const.BLUE_SCORE_AREA) and self.gamestate.disc.holder_key.team_id == self.gamestate.const.BLUE_TEAM_ID:                
@@ -65,25 +86,7 @@ class RuleSystem:
                 self.hold_time = 0.0
                 return self.states['RESET']
 
-        #处理飞盘抢夺
-        if self.gamestate.disc.state == 'competing':
-            if self.gamestate.disc.competing_ticks > 0:
-                self.gamestate.disc.competing_ticks -= 1
-            
-            elif self.gamestate.disc.competing_ticks <= 0:
-                self.gamestate.disc.holder_key = choice(self.gamestate.disc.sub_holder)
-                holder = self.gamestate.team_list[self.gamestate.disc.holder_key.team_id].player_list[self.gamestate.disc.holder_key.player_id]
-                holder.hold_disc = True
-                self.hold_time = 0.0
-                self.gamestate.disc.sub_holder = []
-                self.gamestate.disc.pos[0] = self.gamestate.team_list[self.gamestate.disc.holder_key.team_id].player_list[self.gamestate.disc.holder_key.player_id].pos[0]
-                self.gamestate.disc.pos[1] = self.gamestate.team_list[self.gamestate.disc.holder_key.team_id].player_list[self.gamestate.disc.holder_key.player_id].pos[1]
-                self.gamestate.disc.pos[2] = 0
-                self.gamestate.disc.velocity = [0, 0, 0]     
-                self.gamestate.disc.state = 'catched'
-                self.event_bus.publish(DiscCatchEvent(self.gamestate.disc.holder_key))
-                self.gamestate.disc.competing_ticks = 0
-                self.last_holder_key = self.gamestate.disc.holder_key
+
 
         #检测盘落地
         if self.gamestate.disc.state == 'ground':
