@@ -252,4 +252,4 @@ if __name__ == "__main__":
     try:
         game.mainloop()
     except KeyboardInterrupt:
-        print('游戏已被外部中断(说, 是不是你自己手贱按了ctrl+C!)')
+        print('游戏已被外部中断(大概率是你自己按了ctrl+C!)')
