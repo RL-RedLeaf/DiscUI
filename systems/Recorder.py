@@ -1,12 +1,13 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
 from events import *
+from .GameState import GameStateSnap
+from entities import PlayerKey, DiscSnap, PlayerSnap, TeamSnap
+from config import Constants
 
 import json
 
 if TYPE_CHECKING:
-    from entities import PlayerKey
-    from .GameState import GameStateSnap
     from .EventBus import EventBus
 
 
@@ -16,8 +17,12 @@ class Recorder:
             return None
         return [player_key.team_id, player_key.player_id]
 
+    def list_to_player_key(self, player_key: list[int]):
+        if player_key is None:
+            return None
+        return PlayerKey(player_key[0], player_key[1])
 
-    def game_state_to_record(self, state):
+    def game_state_to_record(self, state: GameStateSnap):
         return {
             "t": state.tick,
             "s": list(state.score),
@@ -36,6 +41,32 @@ class Recorder:
             ],
         }
 
+    def record_to_game_state_snap(self, line) -> GameStateSnap:
+        return GameStateSnap(
+            disc = DiscSnap(pos = tuple(line["d"][0:3]),
+                            holder_key = self.list_to_player_key(line["d"][7]),
+                            velocity =  tuple(line["d"][3:6]),
+                            state = self.decode_disc_state(line["d"][6])
+            ),
+            team_list = tuple(
+                TeamSnap(team_id = t,
+                         player_num = len(line["p"][t]),
+                         player_list = tuple(
+                             PlayerSnap(player_key = PlayerKey(t, p), 
+                                        pos = tuple(line["p"][t][p][0:2]),
+                                        hold_disc = bool(line["p"][t][p][2])
+                            )
+                            for p in range(len(line["p"][t]))
+                         )
+                )
+                for t in range(len(line["p"]))
+            ),
+            delta_time = 0,
+            const = Constants(),
+            score = tuple(line["s"]),
+            tick = line["t"]
+        )
+
     def encode_disc_state(self, state):
         return {
             "waiting": "w",
@@ -43,6 +74,15 @@ class Recorder:
             "competing": "x",
             "catched": "c",
             "ground": "g",
+        }[state]
+
+    def decode_disc_state(self, state):
+        return {
+            "w": "waiting",
+            "f": "flying",
+            "x": "competing",
+            "c": "catched",
+            "g": "ground",
         }[state]
 
     def on_game_start(self, event: GameStartEvent):
@@ -84,3 +124,20 @@ class Recorder:
         if self.file is not None:
             self.file.close()
             self.file = None
+
+    def open_read(self, path):
+        self.file = open(path, "r", encoding="utf-8")
+        self.lines = self.file.readlines()
+
+    def read(self, line_number):
+        if line_number >= len(self.lines):
+            return False
+        
+        elif self.lines[line_number]:  
+            line = json.loads(self.lines[line_number])
+            return self.record_to_game_state_snap(line)
+
+        else:
+            print(f'{line_number} 行为空')
+            return None
+

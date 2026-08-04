@@ -1,6 +1,6 @@
 from DiscGame import GameCoordinator
 from ui import PygameRenderPort
-from PlayerAgents import *
+from agents.tger_agent import *
 
 
 

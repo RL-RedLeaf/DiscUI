@@ -191,7 +191,8 @@ class GameCoordinator():
         self.pending_state.append(self.states['PLAY'])
 
     def _halt(self):
-        self.recorder.close()
+        if self.record:
+            self.recorder.close()
         exit(114514)
 
     def _trans(self, from_state, to_state) -> bool:
@@ -260,19 +261,58 @@ class GameCoordinator():
     def on_score_event(self, event: ScoreEvent):
         self.score_team_id = event.score_team_id
 
+
+class Replayer():
+    def __init__(self, start: int, render: RenderPort, path, fps = 60):
+        self.recorder = Recorder()
+        self.index = start
+        self.render = render
+        self.event_bus = EventBus()
+        self.constants = Constants()
+        self.dt = 1 / fps
+        self.frame_start = 0
+        self.frame_elapsed = 0
+        self.sleep_time = 0
+
+        self.render.init(self.constants.GAME_SIZE, self.event_bus)
+        self.recorder.open_read(path)
+
+    def replay_loop(self):
+        self.frame_start = time.perf_counter()
+
+        self.snap = self.recorder.read(self.index)
+        if self.snap is None:
+            pass
+        elif self.snap is False:
+            exit(1919)
+        else:
+            self.event_bus.publish(GamePlayEvent(self.snap))
+
+        self.index += 1
+
+        self.frame_elapsed = time.perf_counter() - self.frame_start
+        self.sleep_time = self.dt - self.frame_elapsed
+
+        time.sleep(max(self.sleep_time, 0))
+    
+
+
 from ui import PygameRenderPort
 from PlayerAgents import *
 
 
 #[emptyPlayerAgent(), emptyPlayerAgent(), emptyPlayerAgent(), emptyPlayerAgent()]
 if __name__ == "__main__":
-    game = GameCoordinator(4, player_agent_list=[[emptyPlayerAgent(), emptyPlayerAgent(), emptyPlayerAgent(), emptyPlayerAgent()],[emptyPlayerAgent(), emptyPlayerAgent(), emptyPlayerAgent(), emptyPlayerAgent()]], fps=60, record = True)
-    game.set_render(PygameRenderPort(1230, 1200))
+    # game = GameCoordinator(4, player_agent_list=[[emptyPlayerAgent(), emptyPlayerAgent(), emptyPlayerAgent(), emptyPlayerAgent()],[emptyPlayerAgent(), emptyPlayerAgent(), emptyPlayerAgent(), emptyPlayerAgent()]], fps=60, record = True)
+    # game.set_render(PygameRenderPort(1230, 1200))
 
-    # from EventMonitor import EventMonitor
-    # event_monitor = EventMonitor(event_bus=game.event_bus)  #创建事件监控器实例, 不过这玩意就调试用, 不然 play 状态得吵死
-    try:
-        game.mainloop()
-    except KeyboardInterrupt:
-        print('游戏已被外部中断(大概率是你自己按了ctrl+C!)')
-        game._halt()
+    # # from EventMonitor import EventMonitor
+    # # event_monitor = EventMonitor(event_bus=game.event_bus)  #创建事件监控器实例, 不过这玩意就调试用, 不然 play 状态得吵死
+    # try:
+    #     game.mainloop()
+    # except KeyboardInterrupt:
+    #     print('游戏已被外部中断(大概率是你自己按了ctrl+C!)')
+    #     game._halt()
+    game_replay = Replayer(0, PygameRenderPort(1230, 1200), 'records\\game_20260804_211931.jsonl')
+    while True:
+        game_replay.replay_loop()
