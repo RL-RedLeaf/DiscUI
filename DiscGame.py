@@ -6,6 +6,15 @@ from systems import *
 from ui import *
 from random import choice as randchoice
 import time
+from datetime import datetime
+from pathlib import Path
+
+def make_record_path() -> Path:
+    record_dir = Path(__file__).resolve().parent / "records"
+    record_dir.mkdir(exist_ok=True)
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    return record_dir / f"game_{timestamp}.jsonl"
 
 class State(Enum):
     PREPARE = auto()
@@ -16,7 +25,7 @@ class State(Enum):
     HALT = auto()
 
 class GameCoordinator():
-    def __init__(self, player_num: int, player_agent_list: list[list], fps: int, *args, **kwargs):
+    def __init__(self, player_num: int, player_agent_list: list[list], fps: int, record = False, *args, **kwargs):
         self.player_num = player_num
         self.player_agent_list = player_agent_list
         self.fps = fps
@@ -37,6 +46,8 @@ class GameCoordinator():
         self.frame_overrun = 0.0
         self.sum_elapsed = 0.0
 
+        self.record = record
+
     def _init_states(self):
         self.states = State
         self.current_state = self.states["PREPARE"]
@@ -53,6 +64,10 @@ class GameCoordinator():
         self.physics = PhysicSystem()
         self.rules = RuleSystem()
         self.actions = ActionSystem()
+
+        if self.record:
+            self.recorder = Recorder()
+            self.recorder.setup(make_record_path(), self.event_bus)
 
         try:
             self.render.init(self.constants.GAME_SIZE, self.event_bus)
@@ -175,6 +190,10 @@ class GameCoordinator():
 
         self.pending_state.append(self.states['PLAY'])
 
+    def _halt(self):
+        self.recorder.close()
+        exit(114514)
+
     def _trans(self, from_state, to_state) -> bool:
         return True
 
@@ -229,7 +248,10 @@ class GameCoordinator():
 
 
         print("游戏结束, 进入 HALT 状态")
-        exit(114514)
+        self._halt()
+        
+
+        
 
 
     def on_foul_event(self, event: FoulEvent):
@@ -244,7 +266,7 @@ from PlayerAgents import *
 
 #[emptyPlayerAgent(), emptyPlayerAgent(), emptyPlayerAgent(), emptyPlayerAgent()]
 if __name__ == "__main__":
-    game = GameCoordinator(4, player_agent_list=[[emptyPlayerAgent(), emptyPlayerAgent(), emptyPlayerAgent(), emptyPlayerAgent()],[emptyPlayerAgent(), emptyPlayerAgent(), emptyPlayerAgent(), emptyPlayerAgent()]], fps=60)
+    game = GameCoordinator(4, player_agent_list=[[emptyPlayerAgent(), emptyPlayerAgent(), emptyPlayerAgent(), emptyPlayerAgent()],[emptyPlayerAgent(), emptyPlayerAgent(), emptyPlayerAgent(), emptyPlayerAgent()]], fps=60, record = True)
     game.set_render(PygameRenderPort(1230, 1200))
 
     # from EventMonitor import EventMonitor
@@ -253,3 +275,4 @@ if __name__ == "__main__":
         game.mainloop()
     except KeyboardInterrupt:
         print('游戏已被外部中断(大概率是你自己按了ctrl+C!)')
+        game._halt()

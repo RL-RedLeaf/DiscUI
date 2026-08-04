@@ -27,6 +27,22 @@ class RuleSystem:
     def apply(self):
         '''依次判定所有规则事件'''
         return_state = None #预留变量，看看后续要不要加入规则事件缓存和仲裁机制
+
+        #v1.1 把持盘手冲撞放到最前面，防止一帧里刚接盘就冲撞检测持盘手是否被冲撞
+        if self.gamestate.disc.state == 'catched':
+            team = self.gamestate.team_list[self.gamestate.disc.holder_key.team_id]
+            player = self.gamestate.team_list[self.gamestate.disc.holder_key.team_id].player_list[self.gamestate.disc.holder_key.player_id]
+
+            for op_team in self.gamestate.team_list:
+                if op_team.team_id == player.player_key.team_id:
+                    pass    #跳过己方队员
+                else:
+                    for op_player in op_team.player_list:
+                        if self._distance(player.pos, op_player.pos) < self.gamestate.const.PLAYER_SIZE * 2:
+                            self.event_bus.publish(FoulEvent('touch', op_team.team_id, op_player.player_key))
+                            self.hold_time = 0.0
+                            return self.states['RESET']
+
         #v1.1尝试吧抢夺提到最前面，处理飞盘抢夺
         if self.gamestate.disc.state == 'competing':
             if self.gamestate.disc.competing_ticks > 0:
@@ -60,22 +76,6 @@ class RuleSystem:
                 self.gamestate.score[self.gamestate.const.RED_TEAM_ID] += 1
                 self.hold_time = 0.0
                 return self.states['RESET']
-
-
-        #检测持盘手是否被冲撞
-        if self.gamestate.disc.state == 'catched':
-            team = self.gamestate.team_list[self.gamestate.disc.holder_key.team_id]
-            player = self.gamestate.team_list[self.gamestate.disc.holder_key.team_id].player_list[self.gamestate.disc.holder_key.player_id]
-
-            for op_team in self.gamestate.team_list:
-                if op_team.team_id == player.player_key.team_id:
-                    pass    #跳过己方队员
-                else:
-                    for op_player in op_team.player_list:
-                        if self._distance(player.pos, op_player.pos) < self.gamestate.const.PLAYER_SIZE * 2:
-                            self.event_bus.publish(FoulEvent('touch', op_team.team_id, op_player.player_key))
-                            self.hold_time = 0.0
-                            return self.states['RESET']
         
         #检测飞盘持有超时的事情暂时不处理
         if self.gamestate.disc.state == 'catched':
@@ -86,13 +86,12 @@ class RuleSystem:
                 self.hold_time = 0.0
                 return self.states['RESET']
 
-
-
         #检测盘落地
         if self.gamestate.disc.state == 'ground':
             self.hold_time = 0.0
             self.event_bus.publish(FoulEvent('stall', self.last_holder_key.team_id, self.last_holder_key))
             return self.states['RESET']
+        
         #检测盘出界
         if self.gamestate.disc.pos[0] < 0 or self.gamestate.disc.pos[1] < 0 or self.gamestate.disc.pos[0] > self.gamestate.const.GAME_SIZE[0] or self.gamestate.disc.pos[1] > self.gamestate.const.GAME_SIZE[1]:
             self.event_bus.publish(FoulEvent('out', self.last_holder_key.team_id, self.last_holder_key))
