@@ -30,7 +30,7 @@ pip install pygame
 
 ### 基本使用
 
-飞盘框架主入口位于 `DiscGame.py` 的 `GameCoordinator` 。`PlayerAgents.py` 存放了一些基础的Agent。框架采用**分层智能体**架构：每队一个**队伍级 Agent（教练）**负责制定作战计划，每个玩家绑定一个**玩家 Agent**消费计划并产出动作（所以现在不用再纠结什么通信了，直接用一个全局大手子分配即可awa）
+飞盘框架主入口位于 `DiscGame.py` 的 `GameCoordinator` 。`PlayerAgents.py` 存放了一些基础的Agent。框架采用**分层智能体**架构：每队一个**队伍级 Agent（教练）**负责制定作战计划，每个队员绑定一个**队员 Agent**消费计划并产出动作（所以现在不用再纠结什么通信了，直接用一个全局大手子分配即可awa）
 
 * 主入口`GameCoordinator`
 ```python
@@ -39,8 +39,8 @@ class GameCoordinator:
         ...
 ```
 **参数:**
-- `player_num` (int): 每队玩家数量
-- `player_agent_list` (list[list]): 两队玩家agent嵌套列表，第一项为蓝队，最后一项为红队
+- `player_num` (int): 每队队员数量
+- `player_agent_list` (list[list]): 两队队员agent嵌套列表，第一项为蓝队，最后一项为红队
 - `team_agent_list` (list[TeamAgentBase]): 两队队伍级Agent（教练），下标 0 为蓝队、1 为红队
 - `fps` (int): 帧率，同时决定 `delta_time`
 - `record` (bool): 是否将对局录制到 `records/` 目录（平常不建议开启，除非你想要你的盘爆炸（写入大小约为190B/帧））
@@ -65,7 +65,7 @@ game.mainloop()
 
 ### 内置 Agent
 
-`PlayerAgents.py` 提供了空玩家 Agent 和空队伍 Agent：
+`PlayerAgents.py` 提供了空队员 Agent 和空队伍 Agent：
 
 ```python
 class emptyPlayerAgent(AgentBase):
@@ -81,7 +81,7 @@ class emptyTeamAgent(TeamAgentBase):
         self.player_list = player_list
 
     def agent(self, gamestate):
-        return None   # 不产出计划，玩家各自为战
+        return None   # 不产出计划，队员各自为战
 ```
 
 把你自己的 Agent 替换进去就能看到效果了，具体写法见 API 参考。
@@ -108,7 +108,7 @@ DiscUI/
 │   └── Constants.py     # 场地、速度、接盘等常量
 ├── entities/
 │   ├── Disc.py          # 飞盘实体与快照
-│   ├── Team.py          # 队伍、玩家、PlayerKey
+│   ├── Team.py          # 队伍、队员、PlayerKey
 │   └── Entity.py        # 实体基类
 ├── events/
 │   └── Events.py        # 事件类型定义
@@ -117,6 +117,7 @@ DiscUI/
 │   ├── EventBus.py      # 事件总线
 │   ├── GameState.py     # 游戏状态与只读快照
 │   ├── PhysicSystem.py  # 飞盘物理更新
+│   ├── Recorder.py      # 对局录制与回放
 │   └── RuleSystem.py    # 得分、犯规、出界等规则
 ├── ui/
 │   ├── port.py          # RenderPort 接口
@@ -126,17 +127,17 @@ DiscUI/
 
 ### 分层智能体
 
-框架采用**队伍级 + 玩家级**两层智能体结构：
+框架采用**队伍级 + 队员级**两层智能体结构：
 
 - **队伍级 Agent（教练）**：每队一个，继承 `TeamAgentBase`。每帧读取游戏快照，产出一份**作战计划**（角色分配、目标点等，内容完全自定义）。
-- **玩家级 Agent（执行者）**：每个玩家一个，继承 `AgentBase`。每帧接收 `(游戏快照, 本队计划)`，产出自己的动作。
+- **队员级 Agent（执行者）**：每个队员一个，继承 `AgentBase`。每帧接收 `(游戏快照, 本队计划)`，产出自己的动作。
 
-计划在**帧间传递**：教练每帧产出的计划存入框架，下一帧才分发给本队玩家。
+计划在**帧间传递**：教练每帧产出的计划存入框架，下一帧才分发给本队队员。
 反正根据AI给我的介绍，这么做的好处是：
 > - **零锁**：计划的读写只发生在主线程，多线程的 agent 之间不存在共享可变状态，不需要任何锁。
-> - **免费降级**：教练超时或抛异常时框架保留旧计划，玩家继续按上次计划行动；没有计划的帧（比如第一帧），`plan` 为 `None`，玩家各自为战。
+> - **免费降级**：教练超时或抛异常时框架保留旧计划，队员继续按上次计划行动；没有计划的帧（比如第一帧），`plan` 为 `None`，队员各自为战。
 
-教练和玩家之间靠**泛型对齐**保证协议一致：两个基类都是 `Generic[PlanT]`，框架只认识占位符 `PlanT`，建议在自己的 agent 里把它定死为同一个计划类，但是实际上类型检查器不会强制报错，所以嘛...（be like：类型只是资本家的谎言）
+教练和队员之间靠**泛型对齐**保证协议一致：两个基类都是 `Generic[PlanT]`，框架只认识占位符 `PlanT`，建议在自己的 agent 里把它定死为同一个计划类，但是实际上类型检查器不会强制报错，所以嘛...（be like：类型只是资本家的谎言）
 
 具体用法（`PlanT` 在 `systems/ActionSystem.py` 里已定义，不过类型变量名并不重要，关键是两端下标化用**同一个具体计划类**）：
 
@@ -152,11 +153,11 @@ class MyPlan:  # 你的计划类，内容随便定：角色分配、目标点、
 class MyCoach(TeamAgentBase[MyPlan]):    # 教练：产出 MyPlan
     ...
 
-class MyPlayer(AgentBase[MyPlan]):       # 玩家：消费 MyPlan
+class MyPlayer(AgentBase[MyPlan]):       # 队员：消费 MyPlan
     ...
 ```
 
-两边都下标化成同一个 `MyPlan`，协议就锁死了。如果某个玩家写成了 `AgentBase[OtherPlan]`，类型检查器会告诉你的。（绝对是提升生产力的好方法，有了它就只用按 TAB 键了）
+两边都下标化成同一个 `MyPlan`，协议就锁死了。如果某个队员写成了 `AgentBase[OtherPlan]`，类型检查器会告诉你的。（绝对是提升生产力的好方法，有了它就只用按 TAB 键了）
 
 *注：再次声明，泛型检查只在启用类型检查器（pyright/mypy）时生效，纯运行时不受影响，不写下标也能跑。*
 
@@ -177,10 +178,13 @@ event_bus.publish(event_object)
 ```python
     def publish(self, event):
         """发布事件：将事件分发给所有订阅者"""
-        event_type = type(event)
-        if event_type in self.subscribers:
-            for callback in self.subscribers[event_type]:
-                callback(event)
+        for event_type, callbacks in self.subscribers.items():
+            if isinstance(event, event_type):
+                for callback in callbacks:
+                    try:
+                        callback(event)
+                    except Exception as e:
+                        print(f'ERROR: {e}')
 ```
 
 
@@ -209,7 +213,7 @@ game.set_render(PygameRenderPort(1230, 1200))
 game.mainloop()
 ```
 
-`PygameRenderPort(width, height)` 的窗口尺寸是请求尺寸，实际渲染区域会根据场地比例自动缩放。
+`PygameRenderPort(width, height)` 的请求尺寸只是窗口上限，实际窗口会根据场地比例等比缩放（所以其实两个数值都填一样的即可）。
 
 如果不设置渲染器，`game.set_render()` 不会被调用，主循环仍然正常运行，适合后台批量模拟。
 
@@ -217,40 +221,40 @@ game.mainloop()
 
 ### 反作弊系统
 
-隆重推出：全新的反作弊系统！
+隆重推出：**全新的反作弊系统！**
 （在旧的版本中，agent 系统和游戏本体是紧密耦合的，因此无法达到较好的反作弊效果，这次改用全新架构，专防作弊w）
 
-所有 agent 返回的 Intent 在被执行前都会经过 `ActionSystem._anti_cheat()` 校验。校验不通过的动作会被直接丢弃，大部分情况下连错误日志都不会打印——所以如果你的 agent 看起来没反应，建议先检查是不是哪条规则没满足。（当然也很有可能就是项目本身的问题，欢迎反馈）
+所有 agent 返回的 Intent 在被执行前都会经过 `ActionSystem._anti_cheat()` 校验。校验不通过的动作会被直接丢弃，并在控制台打印一些日志，所以如果你的 agent 看起来没反应，建议先检查是不是哪条规则没满足。（当然也很有可能就是项目本身的问题，欢迎反馈）
 
 **移动校验：**
-- 仅限未持盘玩家移动
+- 仅限未持盘队员移动
 - 目标位置必须是长度为 2 的 tuple
 - 移动距离不能超过 `PLAYER_SPEED * delta_time`
 
 **抛盘校验：**
-- 仅限持盘玩家抛盘
+- 仅限持盘队员抛盘
 - 速度必须是长度为 3 的 tuple
-- 三个轴的速度绝对值都必须达到 `MIN_THROW_SPEED` 的下限
+- 二维水平合速度（x、y 轴）必须达到 `MIN_VELOCITY` 的下限
 - 飞盘状态必须是 `"catched"`
 
 **接盘校验：**
 - 飞盘状态必须是 `"flying"`、`"competing"` 或 `"waiting"`
-- 玩家不能已经持盘，飞盘不能已有持有者
-- 玩家与飞盘的二维距离必须在 `CATCH_DISTANCE` 以内
+- 队员不能已经持盘，飞盘不能已有持有者
+- 队员与飞盘的二维距离必须在 `CATCH_DISTANCE` 以内
 - 飞盘高度不能超过 `CATCH_HIGHT`
-- 同一玩家不能重复加入争抢列表
+- 同一队员不能重复加入争抢列表
 
-另外，`CatchIntent` 提交后不会立刻让玩家持盘，而是把玩家加入 `sub_holder` 列表，等规则系统在后续帧（目前为3帧）中结算争抢结果。
+另外，`CatchIntent` 提交后不会立刻让队员持盘，而是把队员加入 `sub_holder` 列表，等规则系统在后续帧（目前为3帧）中结算争抢结果。
 
-*注：反作弊校验不通过的动作直接静默丢弃了，甚至没有任何输出(*
+*注：反作弊校验不通过的动作直接~~静默~~丢弃了，~~甚至没有任何输出(~~ （我成功克服了我的懒癌，并加上了一些输出）*
 
 ### 多线程调度
 
-为了事件管理和性能管理，**队伍级和玩家级** agent 的 `agent()` 方法统一通过 `ThreadPoolExecutor(max_workers=8)` 并发调用。每帧流程如下：
+为了事件管理和性能管理，**队伍级和队员级** agent 的 `agent()` 方法统一通过 `ThreadPoolExecutor(max_workers=8)` 并发调用。每帧流程如下：
 
 1. 检查上一帧遗留的 future：已经完成的直接清理（结果过期，丢弃）；仍在运行的标记为"还在跑"
 2. 提交每队的教练任务，产出作战计划
-3. 为每个不在"还在跑"状态中的玩家 agent 提交新任务，并把**本队上一帧的计划**作为参数传入
+3. 为每个不在"还在跑"状态中的队员 agent 提交新任务，并把**本队上一帧的计划**作为参数传入
 4. 统一等待最多 10ms，收集按时返回的结果
 5. 超时未返回的 future 保留，下一帧如果还没结束，该 agent 不会再提交新任务，并打印：
 
@@ -267,20 +271,24 @@ TeamAgent {team_id} still running, skip
 
 本次更新中也重新参考现实中的飞盘游戏重构了规则，但是可能要诸多不完善，欢迎反馈w
 
-每帧在动作执行和物理更新完成后，`RuleSystem.apply()` 按固定顺序依次判定。一旦某条规则触发了 `RESET`，后续规则不再执行：
+每帧在发布快照后、动作执行和物理更新之前，`RuleSystem.apply()` 按固定顺序依次判定。一旦某条规则触发了 `RESET`，后续规则不再执行：
 
-1. **得分**：持盘者位于对方得分区内时本队得分，重置发盘
-2. **身体接触犯规**：防守方与持盘者距离小于 `PLAYER_SIZE * 2` 时防守方犯规，重置
-3. **持盘超时犯规**：持盘超过 `MAX_HOLD_TIME`（2 秒）时持盘方犯规，重置
-4. **争抢结算**：`competing_ticks` 递减到 0 后，从 `sub_holder` 中随机选一人成为持盘者
+1. **身体接触犯规**：防守方与持盘者距离小于 `PLAYER_SIZE * 2` 时防守方犯规，重置
+2. **争抢结算**：`competing_ticks` 递减到 0 后，从 `sub_holder` 中随机选一人成为持盘者
+3. **得分**：持盘者位于对方得分区内时本队得分，重置发盘
+4. **持盘超时犯规**：持盘超过 `MAX_HOLD_TIME`（2 秒）时持盘方犯规，重置
 5. **飞盘落地**：飞盘 z 轴触地后，最后持盘方犯规，重置
 6. **飞盘出界**：飞盘 xy 坐标超出 `GAME_SIZE` 后，最后持盘方犯规，重置
 
-犯规或得分后的重置会将飞盘移到对方半场的发盘点，并清空所有玩家的持盘标志，但不会移动玩家位置和清空比分（这是试验性的，我想看看如果全场连贯跑下来会不会效果更好，不过后续可能还是会有改动）。
+犯规或得分后的重置会将飞盘移到对方半场的发盘点，并将所有队员移回初始阵型、清空持盘标志，但不会清空比分
+
+~~（这是试验性的，我想看看如果全场连贯跑下来会不会效果更好，不过后续可能还是会有改动）~~
+
+（事实证明，现在的技术水平不支持全场连贯跑动，所以还是让队员回到初始位置为好）
 
 ### 对局录制与回放
 
-**录制**：`GameCoordinator(..., record=True)` 开启后，每帧对局状态都会被写入 `records/game_时间戳.jsonl`（JSONL，每帧一行，约 190B/帧，反正我已经把这玩意关掉了awa）。记录内容包括比分、飞盘位置/速度/状态、持有者，以及两队全部玩家的位置和持盘标志。
+**录制**：`GameCoordinator(..., record=True)` 开启后，每帧对局状态都会被写入 `records/game_时间戳.jsonl`（JSONL，每帧一行，约 190B/帧，反正我已经把这玩意关掉了awa）。记录内容包括比分、飞盘位置/速度/状态、持有者，以及两队全部队员的位置和持盘标志。
 
 每行的 JSON 格式（我已经尽力把能省的都省了，不然几分钟数据量上 MB 级别）：
 
@@ -289,7 +297,7 @@ TeamAgent {team_id} still running, skip
 | `t` | 帧号 |
 | `s` | 比分 `[蓝队, 红队]` |
 | `d` | 飞盘：位置 `(x,y,z)` + 速度 `(vx,vy,vz)` + 状态码 + 持有者（`PlayerKey` 或 `null`） |
-| `p` | 两队玩家，每人 `[x, y, 是否持盘]` |
+| `p` | 两队队员，每人 `[x, y, 是否持盘]` |
 
 飞盘状态码：`w`=waiting，`f`=flying，`x`=competing，`c`=catched，`g`=ground。
 
@@ -300,7 +308,7 @@ from DiscGame import Replayer
 from ui import PygameRenderPort
 
 replayer = Replayer(0, PygameRenderPort(1230, 1200), 'records\\game_xxx.jsonl')
-#这里文件路径使用双斜杠"//"是因为我怕不必要的转义，不过这个担心到底存不存在我也不清楚，反正能跑起来就行
+#这里文件路径使用双斜杠"\\"是因为我怕不必要的转义，不过这个担心到底存不存在我也不清楚，反正能跑起来就行
 while True:
     replayer.replay_loop()
 ```
@@ -318,8 +326,8 @@ while True:
 创建比赛实例。
 
 **参数:**
-- `player_num` (int): 每队玩家数量
-- `player_agent_list` (list[list]): 两队玩家 agent 嵌套列表，`[蓝队agent列表, 红队agent列表]`
+- `player_num` (int): 每队队员数量
+- `player_agent_list` (list[list]): 两队队员 agent 嵌套列表，`[蓝队agent列表, 红队agent列表]`
 - `team_agent_list` (list[TeamAgentBase]): 两队教练，`[蓝队教练, 红队教练]`
 - `fps` (int): 目标帧率，同时决定 `delta_time = 1 / fps`
 - `record` (bool): 是否录制对局，录制文件在 `records/` 目录
@@ -330,9 +338,9 @@ while True:
 
 ### Agent 基类
 
-#### 玩家 Agent（`AgentBase`）
+#### 队员 Agent（`AgentBase`）
 
-自定义玩家 agent 需要继承 `systems.AgentBase`：
+自定义队员 agent 需要继承 `systems.AgentBase`：
 
 ```python
 from entities import PlayerKey
@@ -370,15 +378,15 @@ class MyCoach(TeamAgentBase):
         return MyPlan(...)
 ```
 
-**`init(team_id, player_list)`** 在 `ActionSystem.setup()` 中被调用，`player_list` 是本队全部玩家标识，教练据此分配角色。
+**`init(team_id, player_list)`** 在 `ActionSystem.setup()` 中被调用，`player_list` 是本队全部队员标识，教练据此分配角色。
 
-**`agent(gamestate)`** 每帧接收一个只读快照，返回作战计划。计划内容完全自定义（角色分配、目标点、战术呼叫……），但**教练和玩家必须使用同一个计划类**——两个基类都是 `Generic[PlanT]`，建议在你的 agent 文件里把 `PlanT` 定死为具体的计划类，让类型检查器保证两侧协议一致。
+**`agent(gamestate)`** 每帧接收一个只读快照，返回作战计划。计划内容完全自定义（角色分配、目标点、战术呼叫……），但**教练和队员必须使用同一个计划类**——两个基类都是 `Generic[PlanT]`，建议在你的 agent 文件里把 `PlanT` 定死为具体的计划类，让类型检查器保证两侧协议一致。
 
 #### Intent 类型
 
 | Intent | 字段 | 说明 |
 |--------|------|------|
-| `MoveIntent` | `target_pos: tuple[int]` 长度 2 | 移动玩家到目标 (x, y)，仅限未持盘 |
+| `MoveIntent` | `target_pos: tuple[int]` 长度 2 | 移动队员到目标 (x, y)，仅限未持盘 |
 | `ThrowIntent` | `disc_id: int`, `motion: tuple[int]` 长度 3 | 以速度 (vx, vy, vz) 抛盘，需持盘 |
 | `CatchIntent` | `disc_id: int` | 请求接住飞盘，满足距离和高度条件后加入争抢 |
 
@@ -427,7 +435,7 @@ class PlayerSnap:
     hold_disc: bool            # 是否持盘
 ```
 
-`PlayerKey(team_id, player_id)` 是玩家唯一标识，分别通过 `team_id` 和 `player_id` 索引到具体玩家：
+`PlayerKey(team_id, player_id)` 是队员唯一标识，分别通过 `team_id` 和 `player_id` 索引到具体队员：
 
 ```python
 player = gamestate.team_list[player_key.team_id].player_list[player_key.player_id]
