@@ -126,8 +126,8 @@ class Recorder:
             self.file = None
 
     def open_read(self, path):
-        self.file = open(path, "r", encoding="utf-8")
-        self.lines = self.file.readlines()
+        with open(path, "r", encoding="utf-8") as f:
+            self.lines = f.readlines()
 
     def read(self, line_number):
         if line_number >= len(self.lines):
