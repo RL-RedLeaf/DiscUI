@@ -30,23 +30,25 @@ pip install pygame
 
 ### 基本使用
 
-飞盘框架主入口位于 `DiscGame.py` 的 `GameCoordinator` 。`PlayerAgents.py` 存放了一些基础的Agent。框架现在不再区分队伍agent和玩家agent（其实这里我也在想如何实现多队员之间的通信，所以敬请期待），每个玩家直接绑定一个agent实例。
+飞盘框架主入口位于 `DiscGame.py` 的 `GameCoordinator` 。`PlayerAgents.py` 存放了一些基础的Agent。框架采用**分层智能体**架构：每队一个**队伍级 Agent（教练）**负责制定作战计划，每个玩家绑定一个**玩家 Agent**消费计划并产出动作（所以现在不用再纠结什么通信了，直接用一个全局大手子分配即可awa）
 
 * 主入口`GameCoordinator`
 ```python
 class GameCoordinator:
-    def __init__(self, player_num: int, player_agent_list: list[list], fps: int):
+    def __init__(self, player_num: int, player_agent_list: list[list], team_agent_list: list[TeamAgentBase], fps: int, record = False):
         ...
 ```
 **参数:**
 - `player_num` (int): 每队玩家数量
-- `player_agent_list` (list[list]): 两队agent嵌套列表，第一项为蓝队，最后一项为红队
+- `player_agent_list` (list[list]): 两队玩家agent嵌套列表，第一项为蓝队，最后一项为红队
+- `team_agent_list` (list[TeamAgentBase]): 两队队伍级Agent（教练），下标 0 为蓝队、1 为红队
 - `fps` (int): 帧率，同时决定 `delta_time`
+- `record` (bool): 是否将对局录制到 `records/` 目录（平常不建议开启，除非你想要你的盘爆炸（写入大小约为190B/帧））
 
 * 调用示例
 ```python
 from DiscGame import GameCoordinator
-from PlayerAgents import emptyPlayerAgent
+from PlayerAgents import emptyPlayerAgent, emptyTeamAgent
 from ui import PygameRenderPort
 
 player_num = 4
@@ -54,23 +56,32 @@ player_agent_list = [
     [emptyPlayerAgent() for _ in range(player_num)],
     [emptyPlayerAgent() for _ in range(player_num)],
 ]
+team_agent_list = [emptyTeamAgent(), emptyTeamAgent()]
 
-game = GameCoordinator(player_num, player_agent_list, fps=60)
+game = GameCoordinator(player_num, player_agent_list, team_agent_list, fps=60)
 game.set_render(PygameRenderPort(1230, 1200))
 game.mainloop()
 ```
 
 ### 内置 Agent
 
-`PlayerAgents.py` 提供了一个空 Agent：
+`PlayerAgents.py` 提供了空玩家 Agent 和空队伍 Agent：
 
 ```python
 class emptyPlayerAgent(AgentBase):
     def init(self, player_key):
         self.player_key = player_key
 
-    def agent(self, gamestate):
+    def agent(self, gamestate, plan):
         return []   # 什么都不做
+
+class emptyTeamAgent(TeamAgentBase):
+    def init(self, team_id, player_list):
+        self.team_id = team_id
+        self.player_list = player_list
+
+    def agent(self, gamestate):
+        return None   # 不产出计划，玩家各自为战
 ```
 
 把你自己的 Agent 替换进去就能看到效果了，具体写法见 API 参考。
@@ -84,7 +95,7 @@ class emptyPlayerAgent(AgentBase):
 
 - 使用状态机统一管理游戏内容，至少没有反复引用和横条了
 - 重新设计 agent 调用机制，防止牵一发而动全身
-- 边缘化Eventbus（并非），我也不知道我现在设计他有什么用了(
+- 边缘化Eventbus（并非），总之就不完全依靠这东西作耦合了
 
 ### 核心组件
 
@@ -112,6 +123,42 @@ DiscUI/
 │   └── pygame_adapter.py# pygame 渲染实现
 └── Docs/                # 设计文档与规则说明
 ```
+
+### 分层智能体
+
+框架采用**队伍级 + 玩家级**两层智能体结构：
+
+- **队伍级 Agent（教练）**：每队一个，继承 `TeamAgentBase`。每帧读取游戏快照，产出一份**作战计划**（角色分配、目标点等，内容完全自定义）。
+- **玩家级 Agent（执行者）**：每个玩家一个，继承 `AgentBase`。每帧接收 `(游戏快照, 本队计划)`，产出自己的动作。
+
+计划在**帧间传递**：教练每帧产出的计划存入框架，下一帧才分发给本队玩家。
+反正根据AI给我的介绍，这么做的好处是：
+> - **零锁**：计划的读写只发生在主线程，多线程的 agent 之间不存在共享可变状态，不需要任何锁。
+> - **免费降级**：教练超时或抛异常时框架保留旧计划，玩家继续按上次计划行动；没有计划的帧（比如第一帧），`plan` 为 `None`，玩家各自为战。
+
+教练和玩家之间靠**泛型对齐**保证协议一致：两个基类都是 `Generic[PlanT]`，框架只认识占位符 `PlanT`，建议在自己的 agent 里把它定死为同一个计划类，但是实际上类型检查器不会强制报错，所以嘛...（be like：类型只是资本家的谎言）
+
+具体用法（`PlanT` 在 `systems/ActionSystem.py` 里已定义，不过类型变量名并不重要，关键是两端下标化用**同一个具体计划类**）：
+
+```python
+from typing import TypeVar
+from systems import AgentBase, TeamAgentBase
+
+PlanT = TypeVar("PlanT")
+
+class MyPlan:  # 你的计划类，内容随便定：角色分配、目标点、战术呼叫……
+    ...
+
+class MyCoach(TeamAgentBase[MyPlan]):    # 教练：产出 MyPlan
+    ...
+
+class MyPlayer(AgentBase[MyPlan]):       # 玩家：消费 MyPlan
+    ...
+```
+
+两边都下标化成同一个 `MyPlan`，协议就锁死了。如果某个玩家写成了 `AgentBase[OtherPlan]`，类型检查器会告诉你的。（绝对是提升生产力的好方法，有了它就只用按 TAB 键了）
+
+*注：再次声明，泛型检查只在启用类型检查器（pyright/mypy）时生效，纯运行时不受影响，不写下标也能跑。*
 
 ### 事件驱动架构
 
@@ -199,18 +246,20 @@ game.mainloop()
 
 ### 多线程调度
 
-为了事件管理和性能管理，所有 agent 的 `agent()` 方法通过 `ThreadPoolExecutor(max_workers=8)` 并发调用。每帧流程如下：
+为了事件管理和性能管理，**队伍级和玩家级** agent 的 `agent()` 方法统一通过 `ThreadPoolExecutor(max_workers=8)` 并发调用。每帧流程如下：
 
 1. 检查上一帧遗留的 future：已经完成的直接清理（结果过期，丢弃）；仍在运行的标记为"还在跑"
-2. 为每个不在"还在跑"状态中的 agent 提交新任务到线程池
-3. 等待最多 10ms，收集按时返回的结果
-4. 超时未返回的 future 保留，下一帧如果还没结束，该玩家不会再提交新任务，并打印：
+2. 提交每队的教练任务，产出作战计划
+3. 为每个不在"还在跑"状态中的玩家 agent 提交新任务，并把**本队上一帧的计划**作为参数传入
+4. 统一等待最多 10ms，收集按时返回的结果
+5. 超时未返回的 future 保留，下一帧如果还没结束，该 agent 不会再提交新任务，并打印：
 
 ```
 Agent {player_key} still running, skip
+TeamAgent {team_id} still running, skip
 ```
 
-所以 agent 必须在 10ms 内返回。耗时计算、阻塞 IO、长循环和 sleep 都会导致动作丢帧。如果 agent 抛出异常，本帧该玩家的动作同样被丢弃，并打印错误信息。
+所以 agent 必须在 10ms 内返回。耗时计算、阻塞 IO、长循环和 sleep 都会导致动作丢帧。如果 agent 抛出异常，本帧该 agent 的动作同样被丢弃，并打印错误信息。
 
 *也是终于接触上多线程了awa 预计以后的更新会加入异步内容w*
 
@@ -234,14 +283,16 @@ Agent {player_key} still running, skip
 
 ### GameCoordinator
 
-#### `GameCoordinator(player_num, player_agent_list, fps)`
+#### `GameCoordinator(player_num, player_agent_list, team_agent_list, fps, record = False)`
 
 创建比赛实例。
 
 **参数:**
 - `player_num` (int): 每队玩家数量
-- `player_agent_list` (list[list]): 两队 agent 嵌套列表，`[蓝队agent列表, 红队agent列表]`
+- `player_agent_list` (list[list]): 两队玩家 agent 嵌套列表，`[蓝队agent列表, 红队agent列表]`
+- `team_agent_list` (list[TeamAgentBase]): 两队教练，`[蓝队教练, 红队教练]`
 - `fps` (int): 目标帧率，同时决定 `delta_time = 1 / fps`
+- `record` (bool): 是否录制对局，录制文件在 `records/` 目录
 
 **方法:**
 - `set_render(render)` - 设置渲染器，需要在 `mainloop()` 前调用
@@ -249,7 +300,9 @@ Agent {player_key} still running, skip
 
 ### Agent 基类
 
-自定义 agent 需要继承 `systems.AgentBase`：
+#### 玩家 Agent（`AgentBase`）
+
+自定义玩家 agent 需要继承 `systems.AgentBase`：
 
 ```python
 from entities import PlayerKey
@@ -260,14 +313,36 @@ class MyAgent(AgentBase):
         # 初始化时绑定身份
         self.player_key = player_key
 
-    def agent(self, gamestate: GameStateSnap) -> list:
-        # 接收只读快照，返回 Intent 列表
+    def agent(self, gamestate: GameStateSnap, plan) -> list:
+        # 接收只读快照 + 本队计划，返回 Intent 列表
         return []
 ```
 
 **`init(player_key)`** 在 `ActionSystem.setup()` 中被调用，用于 agent 初始化。
 
-**`agent(gamestate)`** 每帧接收一个 `GameStateSnap`，返回 Intent 列表。返回空列表时本帧不作任何动作。所有 agent 并行调用，单帧超时 10ms。
+**`agent(gamestate, plan)`** 每帧接收一个 `GameStateSnap` 和本队计划（暂无计划时为 `None`），返回 Intent 列表。返回空列表时本帧不作任何动作。所有 agent 并行调用，单帧超时 10ms。
+
+#### 队伍 Agent（`TeamAgentBase`）
+
+自定义教练需要继承 `systems.TeamAgentBase`：
+
+```python
+from systems import TeamAgentBase, GameStateSnap
+
+class MyCoach(TeamAgentBase):
+    def init(self, team_id, player_list: list[PlayerKey]):
+        # 绑定队伍和本队全部 PlayerKey
+        self.team_id = team_id
+        self.player_list = player_list
+
+    def agent(self, gamestate: GameStateSnap) -> MyPlan | None:
+        # 返回本队作战计划；返回 None 表示沿用上一帧计划
+        return MyPlan(...)
+```
+
+**`init(team_id, player_list)`** 在 `ActionSystem.setup()` 中被调用，`player_list` 是本队全部玩家标识，教练据此分配角色。
+
+**`agent(gamestate)`** 每帧接收一个只读快照，返回作战计划。计划内容完全自定义（角色分配、目标点、战术呼叫……），但**教练和玩家必须使用同一个计划类**——两个基类都是 `Generic[PlanT]`，建议在你的 agent 文件里把 `PlanT` 定死为具体的计划类，让类型检查器保证两侧协议一致。
 
 #### Intent 类型
 
