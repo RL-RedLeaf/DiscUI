@@ -278,6 +278,36 @@ TeamAgent {team_id} still running, skip
 
 犯规或得分后的重置会将飞盘移到对方半场的发盘点，并清空所有玩家的持盘标志，但不会移动玩家位置和清空比分（这是试验性的，我想看看如果全场连贯跑下来会不会效果更好，不过后续可能还是会有改动）。
 
+### 对局录制与回放
+
+**录制**：`GameCoordinator(..., record=True)` 开启后，每帧对局状态都会被写入 `records/game_时间戳.jsonl`（JSONL，每帧一行，约 190B/帧，反正我已经把这玩意关掉了awa）。记录内容包括比分、飞盘位置/速度/状态、持有者，以及两队全部玩家的位置和持盘标志。
+
+每行的 JSON 格式（我已经尽力把能省的都省了，不然几分钟数据量上 MB 级别）：
+
+| 键 | 内容 |
+|----|------|
+| `t` | 帧号 |
+| `s` | 比分 `[蓝队, 红队]` |
+| `d` | 飞盘：位置 `(x,y,z)` + 速度 `(vx,vy,vz)` + 状态码 + 持有者（`PlayerKey` 或 `null`） |
+| `p` | 两队玩家，每人 `[x, y, 是否持盘]` |
+
+飞盘状态码：`w`=waiting，`f`=flying，`x`=competing，`c`=catched，`g`=ground。
+
+**回放**：用 `DiscGame.Replayer` 把录制文件喂给任意渲染器：
+
+```python
+from DiscGame import Replayer
+from ui import PygameRenderPort
+
+replayer = Replayer(0, PygameRenderPort(1230, 1200), 'records\\game_xxx.jsonl')
+#这里文件路径使用双斜杠"//"是因为我怕不必要的转义，不过这个担心到底存不存在我也不清楚，反正能跑起来就行
+while True:
+    replayer.replay_loop()
+```
+
+`Replayer(start, render, path, fps=60)`：`start` 是起始帧号（0 表示从头），`replay_loop()` 每调用一次推进一帧并保持帧率。播放完成后自动退出
+
+回放走的是 `GamePlayEvent`，所以**自定义渲染器只要订阅了 `GamePlayEvent` 就能直接看回放**，零额外适配（原汤化原食这一块/.）
 
 ## API参考
 
