@@ -5,6 +5,7 @@ from agents.tger_agent import *
 
 
 #[emptyPlayerAgent(), emptyPlayerAgent(), emptyPlayerAgent(), emptyPlayerAgent()]
+#[TgerAgent(), TgerAgent(), TgerAgent(), TgerAgent()]
 if __name__ == "__main__":
     game = GameCoordinator(4, player_agent_list=[[TgerAgent(), TgerAgent(), TgerAgent(), TgerAgent()],[TgerAgent(), TgerAgent(), TgerAgent(), TgerAgent()]], fps=60, record = True)
     game.set_render(PygameRenderPort(1230, 1200))

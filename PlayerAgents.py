@@ -19,3 +19,5 @@ class emptyPlayerAgent(AgentBase):
     def agent(self, gamestate: GameStateSnap) -> list[Intent]:
         return []
 
+class LeafPlayerAgent(AgentBase):
+    player_key: PlayerKey

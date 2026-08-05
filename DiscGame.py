@@ -107,16 +107,19 @@ class GameCoordinator():
     def _play(self):
         self.gamestate_snap = self.gamestate.create_snap()
         self.event_bus.publish(GamePlayEvent(self.gamestate_snap))
-
+        #先发布快照，渲染或者记录
+        pending = self.rules.apply()        
+        if pending:
+            self.pending_state.append(pending)
+        #这里把规则判定提到最前面，保证只判定到已发布的内容，防止各系统实施更改以后还没有创建快照就发布
         self.actions.agent_loop(self.gamestate_snap)
         self.actions.apply()
 
         self.physics.apply()
         self.gamestate.tick += 1
-        pending = self.rules.apply()
+        
 
-        if pending:
-            self.pending_state.append(pending)
+
         
 
     def _pause(self):
