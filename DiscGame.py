@@ -25,9 +25,10 @@ class State(Enum):
     HALT = auto()
 
 class GameCoordinator():
-    def __init__(self, player_num: int, player_agent_list: list[list], fps: int, record = False, *args, **kwargs):
+    def __init__(self, player_num: int, player_agent_list: list[list], team_agent_list: list[TeamAgentBase], fps: int, record = False, *args, **kwargs):
         self.player_num = player_num
         self.player_agent_list = player_agent_list
+        self.team_agent_list = team_agent_list
         self.fps = fps
         self.event_bus = EventBus()     #由于外部可能需要使用EventBus, 因此提前创建
         self.pending_state = []
@@ -82,9 +83,17 @@ class GameCoordinator():
         self.teams = [Team(Constants.BLUE_TEAM_ID, self.player_num, self.player_agent_list[0]), Team(Constants.RED_TEAM_ID, self.player_num, self.player_agent_list[-1])]
 
         self.register_dict: dict[PlayerKey, Player] = {}
+        self.team_register_dict:dict[int, TeamAgentBase] = {}
+
+
         for team in self.teams:
             self.register_dict.update(team.get_register_dict())     #获取并合并两队队员注册表
+            self.team_register_dict[team.team_id] = self.team_agent_list[team.team_id]
+
+
         print(f'注册表已生成, 注册表内容: {self.register_dict}')
+
+        
 
 
         self.first_pull = randchoice([Constants.BLUE_TEAM_ID, Constants.RED_TEAM_ID])
@@ -93,7 +102,7 @@ class GameCoordinator():
         self.disc = Disc(list(Constants.BLUE_TEAM_PULL) if self.first_pull == Constants.BLUE_TEAM_ID else list(Constants.RED_TEAM_PULL))
 
         self.gamestate = GameState(self.disc, self.teams, 1 / self.fps, self.constants, {Constants.BLUE_TEAM_ID: 0, Constants.RED_TEAM_ID: 0}, 0)
-        self.actions.setup(self.register_dict, self.gamestate)                      #将注册表传入动作系统
+        self.actions.setup(self.register_dict, self.team_register_dict, self.gamestate)                      #将注册表传入动作系统
         self.physics.setup(self.gamestate)
         self.rules.setup(self.gamestate, self.states, self.event_bus)
 
@@ -306,7 +315,12 @@ from PlayerAgents import *
 
 #[emptyPlayerAgent(), emptyPlayerAgent(), emptyPlayerAgent(), emptyPlayerAgent()]
 if __name__ == "__main__":
-    # game = GameCoordinator(4, player_agent_list=[[emptyPlayerAgent(), emptyPlayerAgent(), emptyPlayerAgent(), emptyPlayerAgent()],[emptyPlayerAgent(), emptyPlayerAgent(), emptyPlayerAgent(), emptyPlayerAgent()]], fps=60, record = True)
+    # game = GameCoordinator(4, 
+    #                        player_agent_list=[[emptyPlayerAgent(), emptyPlayerAgent(), emptyPlayerAgent(), emptyPlayerAgent()],
+    #                                           [emptyPlayerAgent(), emptyPlayerAgent(), emptyPlayerAgent(), emptyPlayerAgent()]], 
+    #                        team_agent_list = [emptyTeamAgent(), emptyTeamAgent()], 
+    #                        fps=60, 
+    #                        record = True)
     # game.set_render(PygameRenderPort(1230, 1200))
 
     # # from EventMonitor import EventMonitor

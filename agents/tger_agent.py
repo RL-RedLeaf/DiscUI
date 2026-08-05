@@ -100,7 +100,7 @@ class TgerAgent(AgentBase):
         t = min(candidates)
         return (x + vx * t, y + vy * t)
 
-    def agent(self, gamestate: GameStateSnap) -> list[Intent]:
+    def agent(self, gamestate: GameStateSnap, plan = None) -> list[Intent]:
         me = self._me(gamestate)
         disc = gamestate.disc
         c = gamestate.const

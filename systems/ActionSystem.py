@@ -7,6 +7,9 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from systems import GameStateSnap, GameState
 
+from typing import TypeVar, Generic
+PlanT = TypeVar("PlanT")
+
 class Intent:
     pass
 
@@ -28,23 +31,33 @@ class ThrowIntent(Intent):
 class CatchIntent(Intent):
     disc_id: int
 
-class AgentBase(ABC):
+class AgentBase(ABC, Generic[PlanT]):
     @abstractmethod
     def init(self, player_key: PlayerKey):
         '''此函数用于设置playerKey'''
         pass
 
     @abstractmethod
-    def agent(self, gamestate: GameStateSnap) -> list:
+    def agent(self, gamestate: GameStateSnap, plan: PlanT) -> list:
         '''此处接受游戏快照, 返回 Intent 列表'''
         pass
 
+class TeamAgentBase(ABC, Generic[PlanT]):
+    @abstractmethod
+    def init(self, team_id, player_list: list[PlayerKey]):
+        '''此函数接受teamID和所在队伍playerKey的列表'''
+        pass
 
+    @abstractmethod
+    def agent(self, gamestate: GameStateSnap) -> PlanT | None:
+        '''此函数接受游戏快照，返还下一帧的作战计划'''
+        pass
 
 class ActionSystem:
     def __init__(self):
         self.executor = ThreadPoolExecutor(max_workers=8)
         self.agent_time_limit = 0.01
+        self.latest_plan = {}
 
     def _distance2d(self, pos1: list[float], pos2: list[float]):
         return ((pos1[0] - pos2[0]) ** 2 + (pos1[1] - pos2[1]) ** 2) ** 0.5
@@ -56,15 +69,23 @@ class ActionSystem:
     def _bigger_speed(self, velocity: tuple[float, float, float], limit: float) -> bool:
         return (velocity[0] ** 2 + velocity[1] ** 2) ** 0.5 >=  limit
 
-    def setup(self, register_dict: dict, gamestate: GameState) -> bool:
+    def setup(self, register_dict: dict, team_register_dict:dict, gamestate: GameState) -> bool:
         '''设置注册表, 此处返回 bool 用以表示注册表是否成功设置'''
         self.register_dict = register_dict
+        self.team_register_dict = team_register_dict
         self.gamestate = gamestate
         self.running_futures = {}
+        self.running_team_futures = {}
 
         try:
             for player_key, agent in register_dict.items():
                 agent.init(player_key)
+
+            for team_id, team_agent in team_register_dict.items():
+                player_list = [key for key in register_dict if key.team_id == team_id]
+                team_agent.init(team_id, player_list)
+                self.latest_plan[team_id] = None
+
         except Exception as e:
             # print(f'ERROR:{e}')
             pass
@@ -80,38 +101,66 @@ class ActionSystem:
                 # 旧结果过期，不使用，只清掉
                 del self.running_futures[player_key]
 
+        for team_id, future in list(self.running_team_futures.items()):
+            if future.done():
+                # 旧结果过期，不使用，只清掉
+                del self.running_team_futures[team_id]
 
-        future_to_player = {}
+
+
+        future_to_target = {}
+        for team_id, team_agent in self.team_register_dict.items():
+            if team_id in self.running_team_futures:
+                # 上一次还没跑完，本帧不再提交
+                print(f"TeamAgent {team_id} still running, skip")
+                continue
+            future = self.executor.submit(team_agent.agent, state)
+            future_to_target[future] = ("team", team_id)
+            self.running_team_futures[team_id] = future
+
         for player_key, agent in self.register_dict.items():
             if player_key in self.running_futures:
                 # 上一次还没跑完，本帧不再提交
                 print(f"Agent {player_key} still running, skip")
                 continue
 
-            future = self.executor.submit(agent.agent, state)
-            future_to_player[future] = player_key
+            plan = self.latest_plan.get(player_key.team_id)
+            future = self.executor.submit(agent.agent, state, plan)
+            future_to_target[future] = ("player", player_key)
             self.running_futures[player_key] = future
 
         done, not_done = wait(
-        future_to_player.keys(),
-        timeout=self.agent_time_limit)
+            future_to_target.keys(),
+            timeout=self.agent_time_limit
+            )
+
 
         for future in done:
-            player_key = future_to_player[future]
+            kind, key = future_to_target[future]
 
+            if kind == "team":
+                if self.running_team_futures.get(key) is future:
+                    del self.running_team_futures[key]
+                try:
+                    plan = future.result()
+                except Exception as e:
+                    print(f"TeamAgent {key} error: {e}")
+                    continue
+                if plan is not None:
+                    self.latest_plan[key] = plan      # 主线程写回，下一帧才被读到
+                continue
+
+            # kind == "player"
+            player_key = key
             if self.running_futures.get(player_key) is future:
                 del self.running_futures[player_key]
-
-
             try:
                 intents = future.result()
             except Exception as e:
                 print(f"Agent {player_key} error: {e}")
                 continue
-
             if not intents:
                 continue
-
             for intent in intents:
                 action = self._envelope(player_key, intent)
                 if self._anti_cheat(state, action):

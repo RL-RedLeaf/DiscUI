@@ -1,13 +1,14 @@
 from DiscGame import GameCoordinator
 from ui import PygameRenderPort
 from agents.tger_agent import *
+from PlayerAgents import emptyTeamAgent
 
 
 
 #[emptyPlayerAgent(), emptyPlayerAgent(), emptyPlayerAgent(), emptyPlayerAgent()]
 #[TgerAgent(), TgerAgent(), TgerAgent(), TgerAgent()]
 if __name__ == "__main__":
-    game = GameCoordinator(4, player_agent_list=[[TgerAgent(), TgerAgent(), TgerAgent(), TgerAgent()],[TgerAgent(), TgerAgent(), TgerAgent(), TgerAgent()]], fps=60, record = True)
+    game = GameCoordinator(4, player_agent_list=[[TgerAgent(), TgerAgent(), TgerAgent(), TgerAgent()],[TgerAgent(), TgerAgent(), TgerAgent(), TgerAgent()]], team_agent_list = [emptyTeamAgent(), emptyTeamAgent()], fps=60, record = True)
     game.set_render(PygameRenderPort(1230, 1200))
 
     from EventMonitor import EventMonitor
