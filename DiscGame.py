@@ -308,28 +308,33 @@ class Replayer():
         time.sleep(max(self.sleep_time, 0))
     
 
-
 from ui import PygameRenderPort
 from PlayerAgents import *
+from EventMonitor import EventMonitor
 
+def main(player_num: int = 4, player_agent_list: list[AgentBase] = [[emptyPlayerAgent(), emptyPlayerAgent(), emptyPlayerAgent(), emptyPlayerAgent()],[emptyPlayerAgent(), emptyPlayerAgent(), emptyPlayerAgent(), emptyPlayerAgent()]], team_agent_list: list[AgentBase] = [emptyTeamAgent(), emptyTeamAgent()], fps: int = 60, render: RenderPort = PygameRenderPort(1230, 1200),monitor: bool = False, record: bool = False):
+    game = GameCoordinator(player_num = player_num, 
+                           player_agent_list = player_agent_list, 
+                           team_agent_list = team_agent_list, 
+                           fps = fps, 
+                           record = record)
+    game.set_render(render = render)
+    if monitor:
+        event_monitor = EventMonitor(event_bus=game.event_bus)  #创建事件监控器实例, 不过这玩意就调试用, 不然 play 状态得吵死
+    try:
+        game.mainloop()
+    except KeyboardInterrupt:
+        print('游戏已被外部中断(大概率是你自己按了ctrl+C!)')
+        game._halt()
+
+def replay(path, start: int = 0, render:RenderPort = PygameRenderPort(1230, 1200)):
+    game_replay = Replayer(start = start, 
+                           render = render, 
+                           path = path)
+    while True:
+        game_replay.replay_loop()
 
 #[emptyPlayerAgent(), emptyPlayerAgent(), emptyPlayerAgent(), emptyPlayerAgent()]
 if __name__ == "__main__":
-    # game = GameCoordinator(4, 
-    #                        player_agent_list=[[emptyPlayerAgent(), emptyPlayerAgent(), emptyPlayerAgent(), emptyPlayerAgent()],
-    #                                           [emptyPlayerAgent(), emptyPlayerAgent(), emptyPlayerAgent(), emptyPlayerAgent()]], 
-    #                        team_agent_list = [emptyTeamAgent(), emptyTeamAgent()], 
-    #                        fps=60, 
-    #                        record = True)
-    # game.set_render(PygameRenderPort(1230, 1200))
+    replay('records\\game_20260807_102740.jsonl')
 
-    # # from EventMonitor import EventMonitor
-    # # event_monitor = EventMonitor(event_bus=game.event_bus)  #创建事件监控器实例, 不过这玩意就调试用, 不然 play 状态得吵死
-    # try:
-    #     game.mainloop()
-    # except KeyboardInterrupt:
-    #     print('游戏已被外部中断(大概率是你自己按了ctrl+C!)')
-    #     game._halt()
-    game_replay = Replayer(0, PygameRenderPort(1230, 1200), 'records\\game_20260804_211931.jsonl')
-    while True:
-        game_replay.replay_loop()
