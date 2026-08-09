@@ -39,6 +39,7 @@ class GameCoordinator():
         self._init_states()
         self.event_bus.subscribe(FoulEvent, self.on_foul_event)
         self.event_bus.subscribe(ScoreEvent, self.on_score_event)
+        self.event_bus.subscribe(EndEvent, self.on_end_event)   
         #时间管理类
         self.target_frame_time = 1 / fps
         self.frame_start = 0.0
@@ -48,6 +49,10 @@ class GameCoordinator():
         self.sum_elapsed = 0.0
 
         self.record = record
+
+        self.end_type = None
+        self.winner_team_id = None
+
 
     def _init_states(self):
         self.states = State
@@ -202,10 +207,31 @@ class GameCoordinator():
 
         self.pending_state.append(self.states['PLAY'])
 
-    def _halt(self):
+    def _halt(self, interrupt: bool = False):
         if self.record:
+            self.recorder.record_end(end_type = 'interrupt' if interrupt else self.end_type)
             self.recorder.close()
-        exit(114514)
+
+        if not hasattr(self, 'gamestate'):
+            return None
+
+        blue, red = self.gamestate.score[Constants.BLUE_TEAM_ID], self.gamestate.score[Constants.RED_TEAM_ID]
+
+        if interrupt:
+            print(f'游戏中断, 当前比分{blue}:{red}')
+            return None, (blue, red), 'interrupt'
+
+        if self.winner_team_id is None:
+            print(f"终局: 平局! 比分 {blue}:{red}")
+        else:
+            winner = "蓝队" if self.winner_team_id == Constants.BLUE_TEAM_ID else "红队"
+            print(f"终局: {winner}队伍获胜! (原因: {self.end_type}) 比分 {blue}:{red}")
+        return self.get_result()   
+
+    def get_result(self):
+
+        return self.winner_team_id, (self.gamestate.score[Constants.BLUE_TEAM_ID],
+                                    self.gamestate.score[Constants.RED_TEAM_ID]), self.end_type
 
     def _trans(self, from_state, to_state) -> bool:
         return True
@@ -264,14 +290,15 @@ class GameCoordinator():
         self._halt()
         
 
-        
-
-
     def on_foul_event(self, event: FoulEvent):
         self.foul_team_id = event.foul_team_id
         
     def on_score_event(self, event: ScoreEvent):
         self.score_team_id = event.score_team_id
+
+    def on_end_event(self, event: EndEvent):
+        self.end_type = event.end_type
+        self.winner_team_id = event.success_team_id
 
 
 class Replayer():
@@ -296,7 +323,7 @@ class Replayer():
         if self.snap is None:
             pass
         elif self.snap is False:
-            exit(1919)
+            return False
         else:
             self.event_bus.publish(GamePlayEvent(self.snap))
 
@@ -306,6 +333,8 @@ class Replayer():
         self.sleep_time = self.dt - self.frame_elapsed
 
         time.sleep(max(self.sleep_time, 0))
+
+        return True
     
 
 from ui import PygameRenderPort
@@ -324,17 +353,18 @@ def main(player_num: int = 4, player_agent_list: list[AgentBase] = [[emptyPlayer
     try:
         game.mainloop()
     except KeyboardInterrupt:
-        print('游戏已被外部中断(大概率是你自己按了ctrl+C!)')
-        game._halt()
+        game._halt(interrupt = True)
 
-def replay(path, start: int = 0, render:RenderPort = PygameRenderPort(1230, 1200)):
+def replay(path, start: int = 0, render:RenderPort = PygameRenderPort(1230, 1200), fps: int = 60):
+    running = True
     game_replay = Replayer(start = start, 
                            render = render, 
-                           path = path)
-    while True:
-        game_replay.replay_loop()
+                           path = path,
+                           fps = fps)
+    while running:
+        running = game_replay.replay_loop()
 
 #[emptyPlayerAgent(), emptyPlayerAgent(), emptyPlayerAgent(), emptyPlayerAgent()]
 if __name__ == "__main__":
-    replay('records\\game_20260807_102740.jsonl')
+    replay('records/game_20260809_180333.jsonl', fps = 240)
 

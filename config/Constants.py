@@ -24,3 +24,7 @@ class Constants:
 
     BLUE_SCORE_AREA: tuple[float, float, float, float] = (GAME_SIZE[0] - SCORE_LENTH, 0, SCORE_LENTH, GAME_SIZE[1])
     RED_SCORE_AREA: tuple[float, float, float, float] = (0, 0, SCORE_LENTH, GAME_SIZE[1])
+
+    SUCCESS_SCORE: int = 15
+
+    MAX_TIME: float = 10 * 60

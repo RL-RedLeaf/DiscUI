@@ -48,3 +48,8 @@ class ScoreEvent(Event):
 class ResetEvent(Event):
     pull_team_id: int
     gamestate: GameStateSnap
+
+@dataclass(frozen = True)
+class EndEvent(Event):
+    end_type: str
+    success_team_id: int | None

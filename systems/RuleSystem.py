@@ -28,6 +28,24 @@ class RuleSystem:
         '''依次判定所有规则事件'''
         return_state = None #预留变量，看看后续要不要加入规则事件缓存和仲裁机制
 
+        #分数到达目标分数，游戏结束
+        for team_id,score in self.gamestate.score.items():
+            if score >= self.gamestate.const.SUCCESS_SCORE:
+                self.event_bus.publish(EndEvent('success', team_id))
+                return self.states['HALT']
+
+        #打满全场，游戏结束
+        if self.gamestate.tick * self.gamestate.delta_time > self.gamestate.const.MAX_TIME:
+            if self.gamestate.score[self.gamestate.const.BLUE_TEAM_ID] > self.gamestate.score[self.gamestate.const.RED_TEAM_ID]:
+                self.event_bus.publish(EndEvent('timeout', self.gamestate.const.BLUE_TEAM_ID))
+                return self.states['HALT']
+            elif self.gamestate.score[self.gamestate.const.BLUE_TEAM_ID] < self.gamestate.score[self.gamestate.const.RED_TEAM_ID]:
+                self.event_bus.publish(EndEvent('timeout', self.gamestate.const.RED_TEAM_ID))
+                return self.states['HALT']
+            else:
+                self.event_bus.publish(EndEvent('draw', None))
+                return self.states['HALT']
+
         #v1.1 把持盘手冲撞放到最前面，防止一帧里刚接盘就冲撞检测持盘手是否被冲撞
         if self.gamestate.disc.state == 'catched':
             team = self.gamestate.team_list[self.gamestate.disc.holder_key.team_id]
@@ -76,7 +94,7 @@ class RuleSystem:
                 self.gamestate.score[self.gamestate.const.RED_TEAM_ID] += 1
                 self.hold_time = 0.0
                 return self.states['RESET']
-        
+
         #检测飞盘持有超时的事情暂时不处理
         if self.gamestate.disc.state == 'catched':
             self.hold_time += self.gamestate.delta_time
@@ -97,11 +115,6 @@ class RuleSystem:
             self.event_bus.publish(FoulEvent('out', self.last_holder_key.team_id, self.last_holder_key))
             self.hold_time = 0.0
             return self.states['RESET']
-        
-
-        
 
 
-            
-        
 

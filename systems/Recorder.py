@@ -120,6 +120,16 @@ class Recorder:
         json.dump(data, self.file, ensure_ascii=False, separators=(",", ":"))
         self.file.write("\n")
 
+    def record_end(self, end_type: str):
+        if self.file is None:
+            return
+
+        data = {
+            'end_type': end_type
+        }
+        json.dump(data, self.file, ensure_ascii=False, separators=(",", ":"))
+        self.file.write("\n")
+
     def close(self):
         if self.file is not None:
             self.file.close()
@@ -132,10 +142,14 @@ class Recorder:
     def read(self, line_number):
         if line_number >= len(self.lines):
             return False
-        
+
         elif self.lines[line_number]:  
             line = json.loads(self.lines[line_number])
-            return self.record_to_game_state_snap(line)
+            if 'end_type' in line:
+                print(f'对局结束: {line['end_type']}')
+                return False
+            else:
+                return self.record_to_game_state_snap(line)
 
         else:
             print(f'{line_number} 行为空')

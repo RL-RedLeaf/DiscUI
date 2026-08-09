@@ -10,9 +10,6 @@ from entities import PlayerKey
 from systems import AgentBase, TeamAgentBase, CatchIntent, Intent, MoveIntent, ThrowIntent
 
 
-
-
-
 class RL_Plan:
     pass
 
