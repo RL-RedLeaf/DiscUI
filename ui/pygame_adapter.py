@@ -70,8 +70,8 @@ class PygameRenderPort(RenderPort):
         pygame.draw.circle(self.screen, (0, 0, 0), (state.disc.pos[0] * self.px_portion, state.disc.pos[1] * self.px_portion), CONST.DISC_SIZE * self.px_portion)
         
 
-        self.screen.blit(blue_text, (CONST.GAME_SIZE[0] / 2  * self.px_portion - 10, 5))
-        self.screen.blit(red_text, (CONST.GAME_SIZE[0] / 2  * self.px_portion + 10, 5))
+        self.screen.blit(blue_text, (CONST.GAME_SIZE[0] / 2  * self.px_portion - 20, 5))
+        self.screen.blit(red_text, (CONST.GAME_SIZE[0] / 2  * self.px_portion + 20, 5))
 
         # 更新显示
         pygame.display.flip()

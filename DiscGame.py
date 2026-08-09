@@ -366,5 +366,5 @@ def replay(path, start: int = 0, render:RenderPort = PygameRenderPort(1230, 1200
 
 #[emptyPlayerAgent(), emptyPlayerAgent(), emptyPlayerAgent(), emptyPlayerAgent()]
 if __name__ == "__main__":
-    replay('records/game_20260809_180333.jsonl', fps = 240)
+    replay('records/game_20260809_180333.jsonl', fps = 360)
 
