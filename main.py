@@ -2,10 +2,10 @@ from DiscGame import main
 from ui import PygameRenderPort
 from agents.tger_agent import *
 
-
+player_num = 7
 
 
 #[emptyPlayerAgent(), emptyPlayerAgent(), emptyPlayerAgent(), emptyPlayerAgent()]
 #[TgerAgent(), TgerAgent(), TgerAgent(), TgerAgent()]
 if __name__ == "__main__":
-    main(4, player_agent_list=[[TgerAgent(), TgerAgent(), TgerAgent(), TgerAgent()],[TgerAgent(), TgerAgent(), TgerAgent(), TgerAgent()]], team_agent_list = [TgerTeamAgent(), TgerTeamAgent()], fps=60, record = True)
+    main(player_num, player_agent_list=[[TgerAgent() for i in range(player_num)], [TgerAgent() for i in range(player_num)]], team_agent_list = [TgerTeamAgent() for i in range(2)], fps=60, record = False)
