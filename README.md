@@ -2,7 +2,7 @@
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Platform](https://img.shields.io/badge/platform-windows%20|%20linux%20|%20macos-lightgrey)](https://pypi.org/project/pygame/)
+
 
 DiscUI 是一个 **~~“轻量级”~~** 的飞盘游戏框架，专为智能体设计（当然你也可以用来手操awa）。支持用户自定义编写智能体（agent），并可以开发和测试不同的策略或行为逻辑。
 DiscUI 还支持使用不同渲染器来查看游戏对局（支持自定义），也自带 pygame 渲染器
@@ -494,3 +494,7 @@ game.set_render(MyRenderPort())
 </p>
 
 
+[本来想要完善我的RL(红叶)Agent来着(不是机器学习那个RL!), 但是感觉工作量略有点大, 所以稍微暂缓一下]: # 
+[下一步要优化的一个我非常忍不了的就是Player的访问, 之前设计失误了, 导致需要让PlayerKey和索引吻合才能去访问，但是我实际希望这两个东西是独立的，也就是说哪怕以后变成PlayerKey(114,514)也可以正常访问。]: #
+[所以咱下一步的任务就是把所有访问全部挂到register_dict里去(其实后续Disc也可以这么做喵)]: #
+[当前任务：找出所有需要更改访问方式的地方, 并先标记TODO]: #

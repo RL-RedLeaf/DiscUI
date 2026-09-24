@@ -32,7 +32,7 @@ class Recorder:
                 self.encode_disc_state(state.disc.state),
                 self.player_key_to_list(state.disc.holder_key),
             ],
-            "p": [
+            "p": [  #TODO：其实这里的访问也可以改成注册表访问，但是我个人感觉没必要，而且还要做兼容性考虑
                 [
                     [player.pos[0], player.pos[1], int(player.hold_disc)]
                     for player in team.player_list
@@ -51,7 +51,7 @@ class Recorder:
             team_list = tuple(
                 TeamSnap(team_id = t,
                          player_num = len(line["p"][t]),
-                         player_list = tuple(
+                         player_list = tuple(       #TODO：此处同上
                              PlayerSnap(player_key = PlayerKey(t, p), 
                                         pos = tuple(line["p"][t][p][0:2]),
                                         hold_disc = bool(line["p"][t][p][2])
@@ -89,11 +89,13 @@ class Recorder:
         try:
             self.record(event.game_state)
         except Exception as e:
+            print(f"Error: {e}")
             pass
     def on_game_play(self, event: GamePlayEvent):
         try:
             self.record(event.game_state)
         except Exception as e:
+            print(f"Error: {e}")
             pass
 
     def on_game_reset(self, event: ResetEvent):
@@ -101,6 +103,7 @@ class Recorder:
             self.record(event.gamestate)
             self.file.flush()
         except Exception as e:
+            print(f"Error: {e}")
             pass
 
     def setup(self, path, event_bus: EventBus):

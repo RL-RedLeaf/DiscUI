@@ -49,6 +49,7 @@ class RuleSystem:
         #v1.1 把持盘手冲撞放到最前面，防止一帧里刚接盘就冲撞检测持盘手是否被冲撞
         if self.gamestate.disc.state == 'catched':
             team = self.gamestate.team_list[self.gamestate.disc.holder_key.team_id]
+            #TODO: 将此处访问改为使用注册表访问
             player = self.gamestate.team_list[self.gamestate.disc.holder_key.team_id].player_list[self.gamestate.disc.holder_key.player_id]
 
             for op_team in self.gamestate.team_list:
@@ -68,10 +69,12 @@ class RuleSystem:
             
             elif self.gamestate.disc.competing_ticks <= 0:
                 self.gamestate.disc.holder_key = choice(self.gamestate.disc.sub_holder)
+                #TODO: 将此处访问改为使用注册表访问
                 holder = self.gamestate.team_list[self.gamestate.disc.holder_key.team_id].player_list[self.gamestate.disc.holder_key.player_id]
                 holder.hold_disc = True
                 self.hold_time = 0.0
                 self.gamestate.disc.sub_holder = []
+                #TODO: 将此处访问改为使用注册表访问
                 self.gamestate.disc.pos[0] = self.gamestate.team_list[self.gamestate.disc.holder_key.team_id].player_list[self.gamestate.disc.holder_key.player_id].pos[0]
                 self.gamestate.disc.pos[1] = self.gamestate.team_list[self.gamestate.disc.holder_key.team_id].player_list[self.gamestate.disc.holder_key.player_id].pos[1]
                 self.gamestate.disc.pos[2] = 0

@@ -9,6 +9,7 @@ if TYPE_CHECKING:
 
 @dataclass
 class GameState:
+    #TODO: 增加注册表持有及相关处理（创建快照等）
     disc: Disc
     team_list: list[Team]
     delta_time: float
@@ -21,6 +22,7 @@ class GameState:
     
 @dataclass(frozen = True)
 class GameStateSnap:
+    #TODO: 增加注册表持有
     disc: DiscSnap
     team_list: tuple[TeamSnap]
     delta_time: float

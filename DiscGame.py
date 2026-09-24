@@ -87,7 +87,7 @@ class GameCoordinator():
         print('Start: 场地就绪中')
         self.teams = [Team(Constants.BLUE_TEAM_ID, self.player_num, self.player_agent_list[0]), Team(Constants.RED_TEAM_ID, self.player_num, self.player_agent_list[-1])]
 
-        self.register_dict: dict[PlayerKey, Player] = {}
+        self.register_dict: dict[PlayerKey, Player] = {}    #TODO: 注意这里的注册表类型标错了，这个表根据Key存储的是Agent，后续需要改名或者新建表的
         self.team_register_dict:dict[int, TeamAgentBase] = {}
 
 
@@ -106,7 +106,7 @@ class GameCoordinator():
 
         self.disc = Disc(list(Constants.BLUE_TEAM_PULL) if self.first_pull == Constants.BLUE_TEAM_ID else list(Constants.RED_TEAM_PULL))
 
-        self.gamestate = GameState(self.disc, self.teams, 1 / self.fps, self.constants, {Constants.BLUE_TEAM_ID: 0, Constants.RED_TEAM_ID: 0}, 0)
+        self.gamestate = GameState(self.disc, self.teams, 1 / self.fps, self.constants, {Constants.BLUE_TEAM_ID: 0, Constants.RED_TEAM_ID: 0}, 0)   #TODO: 将注册表传入容器
         self.actions.setup(self.register_dict, self.team_register_dict, self.gamestate)                      #将注册表传入动作系统
         self.physics.setup(self.gamestate)
         self.rules.setup(self.gamestate, self.states, self.event_bus)
@@ -119,7 +119,7 @@ class GameCoordinator():
         pass
 
     def _play(self):
-        self.gamestate_snap = self.gamestate.create_snap()
+        self.gamestate_snap = self.gamestate.create_snap()  #TODO：快照创建时同步创建注册表快照
         self.event_bus.publish(GamePlayEvent(self.gamestate_snap))
         #先发布快照，渲染或者记录
         pending = self.rules.apply()        
@@ -283,6 +283,7 @@ class GameCoordinator():
                     )
                     self.sum_elapsed = 0.0
             except Exception as e:
+                print(f"Error: {e}")
                 pass
 
 
@@ -366,5 +367,5 @@ def replay(path, start: int = 0, render:RenderPort = PygameRenderPort(1230, 1200
 
 #[emptyPlayerAgent(), emptyPlayerAgent(), emptyPlayerAgent(), emptyPlayerAgent()]
 if __name__ == "__main__":
-    replay('records/game_20260809_180333.jsonl', fps = 360)
+    replay('records\\game_20260804_211931.jsonl', fps = 360)
 

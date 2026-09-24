@@ -77,17 +77,17 @@ class ActionSystem:
         self.running_futures = {}
         self.running_team_futures = {}
 
-        try:
+        try:    # 用于给Agent初始化Key
             for player_key, agent in register_dict.items():
                 agent.init(player_key)
-
+            
             for team_id, team_agent in team_register_dict.items():
                 player_list = [key for key in register_dict if key.team_id == team_id]
                 team_agent.init(team_id, player_list)
                 self.latest_plan[team_id] = None
-
+            
         except Exception as e:
-            # print(f'ERROR:{e}')
+            print(f'ERROR:{e}')
             pass
 
         return True
@@ -179,7 +179,7 @@ class ActionSystem:
         
         #1 MoveIntent检测
         if isinstance(action.intent, MoveIntent):
-            #1.0 确认 player
+            #1.0 确认 player    #TODO: 将此处访问改为使用注册表访问
             player = state.team_list[action.player_key.team_id].player_list[action.player_key.player_id]
             disc = state.disc
 
@@ -206,7 +206,7 @@ class ActionSystem:
             
         #2 ThrowIntent检测
         elif isinstance(action.intent, ThrowIntent):
-            #2.0 确认player
+            #2.0 确认player #TODO: 将此处访问改为使用注册表访问
             player = state.team_list[action.player_key.team_id].player_list[action.player_key.player_id]
             disc = state.disc
 
@@ -238,7 +238,7 @@ class ActionSystem:
 
         #3 CatchIntent检测
         elif isinstance(action.intent, CatchIntent):
-            #3.0 确认player
+            #3.0 确认player     #TODO: 将此处访问改为使用注册表访问
             player = state.team_list[action.player_key.team_id].player_list[action.player_key.player_id]
             disc = state.disc
 
@@ -279,6 +279,7 @@ class ActionSystem:
     def apply(self):
         for action in self.action_list:
             if isinstance(action.intent, MoveIntent):
+                #TODO: 将此处访问改为使用注册表访问
                 self.gamestate.team_list[action.player_key.team_id].player_list[action.player_key.player_id].pos = list(action.intent.target_pos)
             
             elif isinstance(action.intent, ThrowIntent):
@@ -286,6 +287,7 @@ class ActionSystem:
                 self.gamestate.disc.velocity = list(action.intent.motion)
                 self.gamestate.disc.pos[2] += 2
                 self.gamestate.disc.state = "flying"
+                #TODO: 将此处访问改为使用注册表访问
                 self.gamestate.team_list[action.player_key.team_id].player_list[action.player_key.player_id].hold_disc = False
 
             elif isinstance(action.intent, CatchIntent):
