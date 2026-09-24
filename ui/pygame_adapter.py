@@ -27,23 +27,27 @@ class PygameRenderPort(RenderPort):
         pygame.init()
 
         self.screen = pygame.display.set_mode((int(game_size[0] * self.px_portion), int(game_size[1] * self.px_portion)))
+        self.score_font = pygame.font.Font(None, 30)
         pygame.display.set_caption("DiscUI")
 
     def on_game_start(self, event: GameStartEvent):
         try:
             self.draw(event.game_state)
         except Exception as e:
+            print(f"Error: {e}")
             pass
     def on_game_play(self, event: GamePlayEvent):
         try:
             self.draw(event.game_state)
         except Exception as e:
+            print(f"Error: {e}")
             pass
 
     def on_game_reset(self, event: ResetEvent):
         try:
             self.draw(event.gamestate)
         except Exception as e:
+            print(f"Error: {e}")
             pass
 
     def draw(self, state: GameStateSnap):
@@ -53,7 +57,7 @@ class PygameRenderPort(RenderPort):
         # 绘制游戏场地
         self.left_score_area = pygame.Rect(0, 0, CONST.SCORE_LENTH * self.px_portion, CONST.GAME_SIZE[1] * self.px_portion)
         self.right_score_area = pygame.Rect(CONST.GAME_SIZE[0] * self.px_portion - CONST.SCORE_LENTH * self.px_portion, 0, CONST.SCORE_LENTH * self.px_portion, CONST.GAME_SIZE[1] * self.px_portion)
-        self.score_font = pygame.font.SysFont('SimHei', 30)
+        
         blue_text = self.score_font.render(f'{state.score[0]}', True, (0, 0, 255))
         red_text = self.score_font.render(f'{state.score[1]}', True, (255, 0, 0))
 
