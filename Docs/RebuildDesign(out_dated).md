@@ -164,7 +164,7 @@ ActionSystem 保存 PlayerKey -> Agent 注册表，并在 PLAY 状态中调用 A
 
 注册表字典结构:
 ```python
-register_dict: dict{PlayerKey, AgentBase} = {   #PlayerKey(team_id, player_id)
+agent_register_dict: dict{PlayerKey, AgentBase} = {   #PlayerKey(team_id, player_id)
     PlayerKey(0, 0): player_agent_0,
     PlayerKey(0, 1): player_agent_1,
     PlayerKey(1, 0): player_agent_2,

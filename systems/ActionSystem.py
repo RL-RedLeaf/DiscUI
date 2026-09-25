@@ -69,20 +69,20 @@ class ActionSystem:
     def _bigger_speed(self, velocity: tuple[float, float, float], limit: float) -> bool:
         return (velocity[0] ** 2 + velocity[1] ** 2) ** 0.5 >=  limit
 
-    def setup(self, register_dict: dict, team_register_dict:dict, gamestate: GameState) -> bool:
+    def setup(self, agent_register_dict: dict, team_register_dict:dict, gamestate: GameState) -> bool:
         '''设置注册表, 此处返回 bool 用以表示注册表是否成功设置'''
-        self.register_dict = register_dict
+        self.agent_register_dict = agent_register_dict
         self.team_register_dict = team_register_dict
         self.gamestate = gamestate
         self.running_futures = {}
         self.running_team_futures = {}
 
         try:    # 用于给Agent初始化Key
-            for player_key, agent in register_dict.items():
+            for player_key, agent in agent_register_dict.items():
                 agent.init(player_key)
             
             for team_id, team_agent in team_register_dict.items():
-                player_list = [key for key in register_dict if key.team_id == team_id]
+                player_list = [key for key in agent_register_dict if key.team_id == team_id]
                 team_agent.init(team_id, player_list)
                 self.latest_plan[team_id] = None
             
@@ -118,7 +118,7 @@ class ActionSystem:
             future_to_target[future] = ("team", team_id)
             self.running_team_futures[team_id] = future
 
-        for player_key, agent in self.register_dict.items():
+        for player_key, agent in self.agent_register_dict.items():
             if player_key in self.running_futures:
                 # 上一次还没跑完，本帧不再提交
                 print(f"Agent {player_key} still running, skip")

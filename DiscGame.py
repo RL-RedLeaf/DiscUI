@@ -87,16 +87,16 @@ class GameCoordinator():
         print('Start: 场地就绪中')
         self.teams = [Team(Constants.BLUE_TEAM_ID, self.player_num, self.player_agent_list[0]), Team(Constants.RED_TEAM_ID, self.player_num, self.player_agent_list[-1])]
 
-        self.register_dict: dict[PlayerKey, Player] = {}    #TODO: 注意这里的注册表类型标错了，这个表根据Key存储的是Agent，后续需要改名或者新建表的
+        self.agent_register_dict: dict[PlayerKey, Player] = {}    #TODO: 注意这里的注册表类型标错了
         self.team_register_dict:dict[int, TeamAgentBase] = {}
 
 
         for team in self.teams:
-            self.register_dict.update(team.get_register_dict())     #获取并合并两队队员注册表
+            self.agent_register_dict.update(team.get_agent_register_dict())     #获取并合并两队队员注册表
             self.team_register_dict[team.team_id] = self.team_agent_list[team.team_id]
 
 
-        print(f'注册表已生成, 注册表内容: {self.register_dict}')
+        print(f'注册表已生成, 注册表内容: {self.agent_register_dict}')
 
         
 
@@ -107,7 +107,7 @@ class GameCoordinator():
         self.disc = Disc(list(Constants.BLUE_TEAM_PULL) if self.first_pull == Constants.BLUE_TEAM_ID else list(Constants.RED_TEAM_PULL))
 
         self.gamestate = GameState(self.disc, self.teams, 1 / self.fps, self.constants, {Constants.BLUE_TEAM_ID: 0, Constants.RED_TEAM_ID: 0}, 0)   #TODO: 将注册表传入容器
-        self.actions.setup(self.register_dict, self.team_register_dict, self.gamestate)                      #将注册表传入动作系统
+        self.actions.setup(self.agent_register_dict, self.team_register_dict, self.gamestate)                      #将注册表传入动作系统
         self.physics.setup(self.gamestate)
         self.rules.setup(self.gamestate, self.states, self.event_bus)
 

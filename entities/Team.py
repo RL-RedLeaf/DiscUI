@@ -49,10 +49,10 @@ class Team:                             #队伍类，与队员和游戏主进程
                             (Constants.BLUE_TEAM_PULL[0] if self.team_id == Constants.BLUE_TEAM_ID else Constants.RED_TEAM_PULL[0],
                              (Constants.GAME_SIZE[1] / (self.player_num + 1)) * (i + 1) )) for i in range(self.player_num)]  #然后身份标识导入 Player
         print(f'队伍 {self.team_id} 已创建, 队员列表: {[str(player) for player in self.player_list]}')
-        self.register_dict = {self.player_peys[i]:self.player_agent_list[i] for i in range(self.player_num)}    #最后生成 Agent 注册表
+        self.agent_register_dict = {self.player_peys[i]:self.player_agent_list[i] for i in range(self.player_num)}    #最后生成 Agent 注册表
 
-    def get_register_dict(self) -> dict:
-        return self.register_dict
+    def get_agent_register_dict(self) -> dict:
+        return self.agent_register_dict
 
     def reset(self) -> bool:    #TODO: 将此处访问改为使用注册表访问
         for i in range(self.player_num):
