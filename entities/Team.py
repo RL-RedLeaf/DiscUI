@@ -44,15 +44,27 @@ class Team:                             #队伍类，与队员和游戏主进程
         self.create_players()
 
     def create_players(self):
-        self.player_peys = [PlayerKey(self.team_id,i) for i in range(self.player_num)]          #先创建身份标识
-        self.player_list = [Player(self.player_peys[i], 
+        self.player_list = []
+        self.agent_register_dict = {}
+        self.register_dict = {}
+
+        for i in range(self.player_num):        #这里不再使用列表魔法语句，是为了保证PlayerKey可以不和索引耦合，同时也更方便维护
+            player_key = PlayerKey(self.team_id,i)  #暂时使用的还是索引ID，但是后续很方便更换成哈希等
+            player = Player(player_key, 
                             (Constants.BLUE_TEAM_PULL[0] if self.team_id == Constants.BLUE_TEAM_ID else Constants.RED_TEAM_PULL[0],
-                             (Constants.GAME_SIZE[1] / (self.player_num + 1)) * (i + 1) )) for i in range(self.player_num)]  #然后身份标识导入 Player
+                            (Constants.GAME_SIZE[1] / (self.player_num + 1)) * (i + 1) ))   #这一行和上面一行是用于计算初始坐标的
+            self.player_list.append(player)
+            self.register_dict[player_key] = player
+            self.agent_register_dict[player_key] = self.player_agent_list[i]    
+
         print(f'队伍 {self.team_id} 已创建, 队员列表: {[str(player) for player in self.player_list]}')
-        self.agent_register_dict = {self.player_peys[i]:self.player_agent_list[i] for i in range(self.player_num)}    #最后生成 Agent 注册表
+
+    def get_register_dict(self) -> dict:
+        return self.register_dict
 
     def get_agent_register_dict(self) -> dict:
         return self.agent_register_dict
+    
 
     def reset(self) -> bool:    #TODO: 将此处访问改为使用注册表访问
         for i in range(self.player_num):
