@@ -30,9 +30,9 @@ class Recorder:
                 *state.disc.pos,
                 *state.disc.velocity,
                 self.encode_disc_state(state.disc.state),
-                self.player_key_to_list(state.disc.holder_key),
+                self.player_key_to_list(state.disc.holder_key), #TODO：如果后续更改player_key格式内容，此处函数实现需要更改
             ],
-            "p": [  #TODO：其实这里的访问也可以改成注册表访问，但是我个人感觉没必要，而且还要做兼容性考虑
+            "p": [  #TODO：如果后续更改player_key格式内容，此处需要显式存储，可以套用上文函数
                 [
                     [player.pos[0], player.pos[1], int(player.hold_disc)]
                     for player in team.player_list
@@ -44,15 +44,16 @@ class Recorder:
     def record_to_game_state_snap(self, line) -> GameStateSnap:
         return GameStateSnap(
             disc = DiscSnap(pos = tuple(line["d"][0:3]),
-                            holder_key = self.list_to_player_key(line["d"][7]),
+                            holder_key = self.list_to_player_key(line["d"][7]),     #TODO：如果后续更改player_key格式内容，此处函数实现需要更改   
                             velocity =  tuple(line["d"][3:6]),
                             state = self.decode_disc_state(line["d"][6])
             ),
             team_list = tuple(
                 TeamSnap(team_id = t,
                          player_num = len(line["p"][t]),
-                         player_list = tuple(       #TODO：此处同上
-                             PlayerSnap(player_key = PlayerKey(t, p), 
+                         player_list = tuple(       
+                             PlayerSnap(player_key = PlayerKey(t, p),   #！注意！：此处player_key只是为了能正常构建快照而生，和正常对局中语义是不一致的
+                                        #TODO：如果后续更改player_key格式内容，则此处需要显式获取，可以套用上文函数
                                         pos = tuple(line["p"][t][p][0:2]),
                                         hold_disc = bool(line["p"][t][p][2])
                             )
@@ -64,7 +65,8 @@ class Recorder:
             delta_time = 0,
             const = Constants(),
             score = tuple(line["s"]),
-            tick = line["t"]
+            tick = line["t"],
+            register_dict = {}  #回放系统下注册表没必要存在
         )
 
     def encode_disc_state(self, state):

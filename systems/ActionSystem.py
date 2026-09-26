@@ -114,7 +114,7 @@ class ActionSystem:
                 # 上一次还没跑完，本帧不再提交
                 print(f"TeamAgent {team_id} still running, skip")
                 continue
-            future = self.executor.submit(team_agent.agent, state)
+            future = self.executor.submit(team_agent.agent, state.fork())   #这里fork了一下因为注册表是可变结构，防止线程之间拿到的结果被污染
             future_to_target[future] = ("team", team_id)
             self.running_team_futures[team_id] = future
 
@@ -125,7 +125,7 @@ class ActionSystem:
                 continue
 
             plan = self.latest_plan.get(player_key.team_id)
-            future = self.executor.submit(agent.agent, state, plan)
+            future = self.executor.submit(agent.agent, state.fork(), plan)  #同上
             future_to_target[future] = ("player", player_key)
             self.running_futures[player_key] = future
 

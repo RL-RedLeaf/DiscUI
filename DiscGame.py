@@ -118,7 +118,7 @@ class GameCoordinator():
         pass
 
     def _play(self):
-        self.gamestate_snap = self.gamestate.create_snap()  #TODO：快照创建时同步创建注册表快照
+        self.gamestate_snap = self.gamestate.create_snap()  
         self.event_bus.publish(GamePlayEvent(self.gamestate_snap))
         #先发布快照，渲染或者记录
         pending = self.rules.apply()        

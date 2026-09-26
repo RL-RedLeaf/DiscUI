@@ -45,8 +45,9 @@ class Team:                             #队伍类，与队员和游戏主进程
 
     def create_players(self):
         self.player_list = []
-        self.agent_register_dict = {}
-        self.register_dict = {}
+        self.agent_register_dict = {}   #Team.player_list 是唯一所有者；后续其实也不需要"同步维护"，只需要在结构性变更时走单一入口（就是一起改）
+        self.register_dict = {}         #Gamestate里的注册表只是一个map，方便读取
+
 
         for i in range(self.player_num):        #这里不再使用列表魔法语句，是为了保证PlayerKey可以不和索引耦合，同时也更方便维护
             player_key = PlayerKey(self.team_id,i)  #暂时使用的还是索引ID，但是后续很方便更换成哈希等
@@ -66,7 +67,7 @@ class Team:                             #队伍类，与队员和游戏主进程
         return self.agent_register_dict
     
 
-    def reset(self) -> bool:    #TODO: 将此处访问改为使用注册表访问
+    def reset(self) -> bool:    #TODO（待定）: 将此处访问改为使用注册表访问
         for i in range(self.player_num):
             self.player_list[i].pos = (Constants.BLUE_TEAM_PULL[0] if self.team_id == Constants.BLUE_TEAM_ID else Constants.RED_TEAM_PULL[0], 
                                        (Constants.GAME_SIZE[1] / (self.player_num + 1)) * (i + 1) )
